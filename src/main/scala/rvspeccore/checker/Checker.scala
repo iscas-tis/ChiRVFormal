@@ -71,8 +71,10 @@ class CheckerWithResult(
 
   // link to spec core
   val specCore = Module(new RiscvCore(singleInstMode))
-  specCore.io.valid := checkInst
-  specCore.io.inst  := io.instCommit.inst
+  specCore.io.valid      := checkInst
+  specCore.io.inst       := io.instCommit.inst
+  specCore.io.sync.valid := io.instCommit.valid && !checkInst
+  specCore.io.sync.bits  := io.result
 
   // initial another io.mem.get.Anotherread
   if (config.functions.tlb) {
@@ -106,7 +108,7 @@ class CheckerWithResult(
     storeQueue.io.enq.bits.data     := io.mem.get.write.data
     storeQueue.io.enq.bits.memWidth := io.mem.get.write.memWidth
 
-    storeQueue.io.deq.ready    := specCore.io.mem.write.valid || ignoreMem
+    storeQueue.io.deq.ready := specCore.io.mem.write.valid || ignoreMem
     when(regDelay(specCore.io.mem.write.valid)) {
       // printf("[SpecCore] store Queue Valid: %x %x %x %x\n", storeQueue.io.deq.valid, storeQueue.io.deq.bits.addr, storeQueue.io.deq.bits.data, storeQueue.io.deq.bits.memWidth)
       assert(regDelay(storeQueue.io.deq.bits.addr) === regDelay(specCore.io.mem.write.addr))
@@ -154,15 +156,15 @@ class CheckerWithResult(
     for (i <- 0 until 32) {
       assert(regDelay(io.result.reg(i.U)) === regDelay(specCore.io.next.reg(i.U)))
     }
-  }
 
-  when(regDelay(io.event.valid) || regDelay(specCore.io.event.valid)) {
-    // Make sure DUT and specCore currently occur the same exception
-    assert(regDelay(io.event.valid) === regDelay(specCore.io.event.valid))
-    assert(regDelay(io.event.intrNO) === regDelay(specCore.io.event.intrNO))
-    assert(regDelay(io.event.cause) === regDelay(specCore.io.event.cause))
-    assert(regDelay(io.event.exceptionPC) === regDelay(specCore.io.event.exceptionPC))
-    assert(regDelay(io.event.exceptionInst) === regDelay(specCore.io.event.exceptionInst))
+    when(regDelay(io.event.valid) || regDelay(specCore.io.event.valid)) {
+      // Make sure DUT and specCore currently occur the same exception
+      assert(regDelay(io.event.valid) === regDelay(specCore.io.event.valid))
+      assert(regDelay(io.event.intrNO) === regDelay(specCore.io.event.intrNO))
+      assert(regDelay(io.event.cause) === regDelay(specCore.io.event.cause))
+      assert(regDelay(io.event.exceptionPC) === regDelay(specCore.io.event.exceptionPC))
+      assert(regDelay(io.event.exceptionInst) === regDelay(specCore.io.event.exceptionInst))
+    }
   }
 
 }
@@ -262,7 +264,7 @@ class CheckerWithWB(
     storeQueue.io.enq.bits.data     := io.mem.get.write.data
     storeQueue.io.enq.bits.memWidth := io.mem.get.write.memWidth
 
-    storeQueue.io.deq.ready    := specCore.io.mem.write.valid || ignoreMem
+    storeQueue.io.deq.ready := specCore.io.mem.write.valid || ignoreMem
     when(regDelay(specCore.io.mem.write.valid)) {
       assert(regDelay(storeQueue.io.deq.bits.addr) === regDelay(specCore.io.mem.write.addr))
       assert(regDelay(storeQueue.io.deq.bits.data) === regDelay(specCore.io.mem.write.data))
@@ -274,7 +276,7 @@ class CheckerWithWB(
        * tlbLoadQueuess(1) -> level 1
        * tlbLoadQueuess(2) -> level 0
        */
-      val tlbLoadQueues = Seq.fill(3)(new Queue(new StoreOrLoadInfoTLB, 1, true, true))
+      val tlbLoadQueues = Seq.fill(3)(Module(new Queue(new StoreOrLoadInfoTLB, 1, true, true)))
       // initial the queue
       for (i <- 0 until 3) {
         tlbLoadQueues(i).io.enq.valid      := io.dtlbmem.get.read.valid && (io.dtlbmem.get.read.level === (2 - i).U)

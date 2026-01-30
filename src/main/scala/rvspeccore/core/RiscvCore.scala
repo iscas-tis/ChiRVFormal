@@ -238,6 +238,7 @@ class RiscvCore(singleInstMode: Option[Inst] = None)(implicit config: RVConfig) 
     val mem      = new MemIO
     val tlb      = if (config.functions.tlb) Some(new TLBIO) else None
     // Processor status
+    val sync = Flipped(Valid(State()))
     val now  = Output(State())
     val next = Output(State())
     // Exposed signals
@@ -253,7 +254,7 @@ class RiscvCore(singleInstMode: Option[Inst] = None)(implicit config: RVConfig) 
   trans.io.tlb.map(_ <> io.tlb.get)
 
   trans.io.now := state
-  state        := trans.io.next
+  state        := Mux(io.sync.valid, io.sync.bits, trans.io.next)
 
   io.now      := state
   io.next     := trans.io.next

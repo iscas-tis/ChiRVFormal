@@ -61,6 +61,8 @@ class CoreTester(genCore: => RiscvCore, memFile: String)(implicit config: RVConf
     }
   }
   core.io.inst := inst
+  core.io.sync.valid := false.B
+  core.io.sync.bits := DontCare
 
   def width2Mask(width: UInt): UInt = {
     MuxLookup(width, 0.U(64.W))(

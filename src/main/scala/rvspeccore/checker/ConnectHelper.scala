@@ -16,13 +16,6 @@ object ConnectHelper {
     val uniqueIdEvent: String = "ConnectChecker_UniqueIdEvent"
     val uniqueIdITLB: String  = "ConnectChecker_UniqueIdITLB"
     val uniqueIdDTLB: String  = "ConnectChecker_UniqueIdDTLB"
-
-    var useRegSource: Boolean   = false
-    var useMemSource: Boolean   = false
-    var useCSRSource: Boolean   = false
-    var useEventSource: Boolean = false
-    var useITLBSource: Boolean  = false
-    var useDTLBSource: Boolean  = false
   }
   import UniqueId._
 
@@ -34,7 +27,6 @@ object ConnectHelper {
   }
 
   def setRegSource(regVec: Vec[UInt])() = {
-    useRegSource = true
     BoringUtils.addSource(regVec, uniqueIdReg)
   }
 
@@ -51,7 +43,6 @@ object ConnectHelper {
   }
 
   def makeMemSource()(implicit XLEN: Int): MemSig = {
-    useMemSource = true
     val mem = Wire(new MemSig)
 
     mem.read.valid     := false.B
@@ -69,14 +60,12 @@ object ConnectHelper {
   }
 
   def makeCSRSource()(implicit XLEN: Int, config: RVConfig): CSR = {
-    useCSRSource = true
     val csr = CSR.wireInit()
     BoringUtils.addSource(csr, uniqueIdCSR)
     csr
   }
 
   def makeEventSource()(implicit XLEN: Int): EventSig = {
-    useEventSource = true
     val event = Wire(new EventSig())
     event := DontCare
     BoringUtils.addSource(event, uniqueIdEvent)
@@ -84,7 +73,6 @@ object ConnectHelper {
   }
 
   def makeTLBSource(isDTLB: Boolean)(implicit XLEN: Int): TLBSig = {
-    if (isDTLB) useDTLBSource = true else useITLBSource = true
     val tlbmem = WireInit(0.U.asTypeOf(new TLBSig))
     BoringUtils.addSource(tlbmem, if (isDTLB) uniqueIdDTLB else uniqueIdITLB)
     tlbmem
@@ -95,7 +83,6 @@ object ConnectHelper {
       memDelay: Int
   )(implicit XLEN: Int, config: RVConfig) = {
     // reg
-    require(useRegSource && useCSRSource && useEventSource)
     if (config.formal.arbitraryRegFile) ArbitraryRegFile.init
 
     val regVec = Wire(Vec(32, UInt(XLEN.W)))
@@ -119,13 +106,11 @@ object ConnectHelper {
     checker.io.result.privilege.internal := DontCare
 
     if (checker.checkMem) {
-      require(useMemSource)
       val mem = Wire(new MemSig)
       mem := DontCare
       BoringUtils.addSink(mem, uniqueIdMem)
       checker.io.mem.get := regNextDelay(mem, memDelay)
       if (config.functions.tlb) {
-        require(useITLBSource && useDTLBSource)
         val dtlbmem = Wire(new TLBSig)
         val itlbmem = Wire(new TLBSig)
         dtlbmem := DontCare
@@ -155,13 +140,11 @@ object ConnectHelper {
 
     // mem
     if (checker.checkMem) {
-      require(useMemSource)
       val mem = Wire(new MemSig)
       mem := DontCare
       BoringUtils.addSink(mem, uniqueIdMem)
       checker.io.mem.get := regNextDelay(mem, memDelay)
       if (config.functions.tlb) {
-        require(useITLBSource && useDTLBSource)
         val dtlbmem = Wire(new TLBSig)
         val itlbmem = Wire(new TLBSig)
         dtlbmem := DontCare

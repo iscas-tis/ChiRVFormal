@@ -119,7 +119,7 @@ class CheckerWithResult(
        * tlbLoadQueuess(1) -> level 1
        * tlbLoadQueuess(2) -> level 0
        */
-      val tlbLoadQueues = Seq.fill(3)(new Queue(new StoreOrLoadInfoTLB, 1, true, true))
+      val tlbLoadQueues = Seq.fill(3)(Module(new Queue(new StoreOrLoadInfoTLB, 1, true, true)))
       // initial the queue
       for (i <- 0 until 3) {
         tlbLoadQueues(i).io.enq.valid      := io.dtlbmem.get.read.valid && (io.dtlbmem.get.read.level === (2 - i).U)

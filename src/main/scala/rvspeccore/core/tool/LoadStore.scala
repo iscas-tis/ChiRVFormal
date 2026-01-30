@@ -194,8 +194,8 @@ trait MMU extends BaseCore with ExceptionSupport {
   }
 
   def IsWriteDirty(PTE: SV39PTE, PA: UInt) = {
-    val FlagPTE    = PTE.flag.asTypeOf(new PTEFlag())
-    val FlagPTEnew = 0.U(8.W).asTypeOf(new PTEFlag())
+    val FlagPTE    = WireInit(PTE.flag.asTypeOf(new PTEFlag()))
+    val FlagPTEnew = WireInit(0.U(8.W).asTypeOf(new PTEFlag()))
     when(~FlagPTE.a | ~FlagPTE.d) {
       FlagPTEnew   := FlagPTE
       FlagPTEnew.a := true.B

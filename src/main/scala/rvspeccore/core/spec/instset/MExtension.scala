@@ -79,102 +79,50 @@ trait MExtension extends BaseCore with CommonDecode with MExtensionInsts {
     )
   }
 
-  def doRV32M: Unit = {
-    // - 7.1 Multiplication Operations
-    // - MUL/MULH[[S]U]
-    when(MUL(inst))    { decodeR; next.reg(rd) := (now.reg(rs1) * now.reg(rs2))(XLEN - 1, 0) }
-    when(MULH(inst))   { decodeR; next.reg(rd) := (now.reg(rs1).asSInt * now.reg(rs2).asSInt).asUInt(XLEN * 2 - 1, XLEN) }
-    when(MULHSU(inst)) { decodeR; next.reg(rd) := (now.reg(rs1).asSInt * now.reg(rs2)).asUInt(XLEN * 2 - 1, XLEN) }
-    when(MULHU(inst))  { decodeR; next.reg(rd) := (now.reg(rs1) * now.reg(rs2))(XLEN * 2 - 1, XLEN) }
-    // - 7.2 Division Operations
-    // - DIV[U]/REM[U]
-    when(DIV(inst))  { decodeR; next.reg(rd) := opDIV(now.reg(rs1), now.reg(rs2), XLEN) }
-    when(DIVU(inst)) { decodeR; next.reg(rd) := opDIVU(now.reg(rs1), now.reg(rs2), XLEN) }
-    when(REM(inst))  { decodeR; next.reg(rd) := opREM(now.reg(rs1), now.reg(rs2), XLEN) }
-    when(REMU(inst)) { decodeR; next.reg(rd) := opREMU(now.reg(rs1), now.reg(rs2), XLEN) }
-  }
-
-  def doRV64M: Unit = {
-    doRV32M
-
-    // - 7.1 Multiplication Operations
-    // - MULW
-    when(MULW(inst)) { decodeR; next.reg(rd) := signExt((now.reg(rs1)(31, 0) * now.reg(rs2)(31, 0))(31, 0), XLEN) }
-    // - 7.2 Division Operations
-    // - DIV[U]W/REM[U]W
-    when(DIVW(inst))  { decodeR; next.reg(rd) := signExt(opDIV(now.reg(rs1)(31, 0), now.reg(rs2)(31, 0), 32), XLEN) }
-    when(DIVUW(inst)) { decodeR; next.reg(rd) := signExt(opDIVU(now.reg(rs1)(31, 0), now.reg(rs2)(31, 0), 32), XLEN) }
-    when(REMW(inst))  { decodeR; next.reg(rd) := signExt(opREM(now.reg(rs1)(31, 0), now.reg(rs2)(31, 0), 32), XLEN) }
-    when(REMUW(inst)) { decodeR; next.reg(rd) := signExt(opREMU(now.reg(rs1)(31, 0), now.reg(rs2)(31, 0), 32), XLEN) }
+  def doMExtension(singleInst: Inst): Unit = {
+    singleInst match {
+      case MUL    => decodeR; next.reg(rd) := (now.reg(rs1) * now.reg(rs2))(XLEN - 1, 0)
+      case MULH   => decodeR; next.reg(rd) := (now.reg(rs1).asSInt * now.reg(rs2).asSInt).asUInt(XLEN * 2 - 1, XLEN)
+      case MULHSU => decodeR; next.reg(rd) := (now.reg(rs1).asSInt * now.reg(rs2)).asUInt(XLEN * 2 - 1, XLEN)
+      case MULHU  => decodeR; next.reg(rd) := (now.reg(rs1) * now.reg(rs2))(XLEN * 2 - 1, XLEN)
+      case DIV    => decodeR; next.reg(rd) := opDIV(now.reg(rs1), now.reg(rs2), XLEN)
+      case DIVU   => decodeR; next.reg(rd) := opDIVU(now.reg(rs1), now.reg(rs2), XLEN)
+      case REM    => decodeR; next.reg(rd) := opREM(now.reg(rs1), now.reg(rs2), XLEN)
+      case REMU   => decodeR; next.reg(rd) := opREMU(now.reg(rs1), now.reg(rs2), XLEN)
+      case MULW =>
+        config.XLEN match {
+          case 64 => decodeR; next.reg(rd) := signExt((now.reg(rs1)(31, 0) * now.reg(rs2)(31, 0))(31, 0), XLEN)
+        }
+      case DIVW =>
+        config.XLEN match {
+          case 64 => decodeR; next.reg(rd) := signExt(opDIV(now.reg(rs1)(31, 0), now.reg(rs2)(31, 0), 32), XLEN)
+        }
+      case DIVUW =>
+        config.XLEN match {
+          case 64 => decodeR; next.reg(rd) := signExt(opDIVU(now.reg(rs1)(31, 0), now.reg(rs2)(31, 0), 32), XLEN)
+        }
+      case REMW =>
+        config.XLEN match {
+          case 64 => decodeR; next.reg(rd) := signExt(opREM(now.reg(rs1)(31, 0), now.reg(rs2)(31, 0), 32), XLEN)
+        }
+      case REMUW =>
+        config.XLEN match {
+          case 64 => decodeR; next.reg(rd) := signExt(opREMU(now.reg(rs1)(31, 0), now.reg(rs2)(31, 0), 32), XLEN)
+        }
+      case _ =>
+    }
   }
 
   def doRVM: Unit = {
-    XLEN match {
-      case 32 => doRV32M
-      case 64 => doRV64M
+    val rv32mInsts = Seq(MUL, MULH, MULHSU, MULHU, DIV, DIVU, REM, REMU)
+    val rv64mInsts = rv32mInsts ++ Seq(MULW, DIVW, DIVUW, REMW, REMUW)
+
+    config.XLEN match {
+      case 32 => rv32mInsts.map(rv32mInst => when(rv32mInst(inst)) { doMExtension(rv32mInst) })
+      case 64 => rv64mInsts.map(rv64mInst => when(rv64mInst(inst)) { doMExtension(rv64mInst) })
     }
   }
 
-  def doMExtension(coreType: String): Unit = {
-    coreType match {
-      case "MUL" =>
-        decodeR; next.reg(rd) := (now.reg(rs1) * now.reg(rs2))(XLEN - 1, 0)
-        specWb.is_inst := MUL(inst);
-      case "MULH" =>
-        decodeR; next.reg(rd) := (now.reg(rs1).asSInt * now.reg(rs2).asSInt).asUInt(XLEN * 2 - 1, XLEN)
-        specWb.is_inst := MULH(inst);
-      case "MULHSU" =>
-        decodeR; next.reg(rd) := (now.reg(rs1).asSInt * now.reg(rs2)).asUInt(XLEN * 2 - 1, XLEN)
-        specWb.is_inst := MULHSU(inst);
-      case "MULHU" =>
-        decodeR; next.reg(rd) := (now.reg(rs1) * now.reg(rs2))(XLEN * 2 - 1, XLEN)
-        specWb.is_inst := MULHU(inst);
-      case "DIV" =>
-        decodeR; next.reg(rd) := opDIV(now.reg(rs1), now.reg(rs2), XLEN)
-        specWb.is_inst := DIV(inst);
-      case "DIVU" =>
-        decodeR; next.reg(rd) := opDIVU(now.reg(rs1), now.reg(rs2), XLEN)
-        specWb.is_inst := DIVU(inst);
-      case "REM" =>
-        decodeR; next.reg(rd) := opREM(now.reg(rs1), now.reg(rs2), XLEN)
-        specWb.is_inst := REM(inst);
-      case "REMU" =>
-        decodeR; next.reg(rd) := opREMU(now.reg(rs1), now.reg(rs2), XLEN)
-        specWb.is_inst := REMU(inst);
-      case "MULW" =>
-        config.XLEN match {
-          case 64 =>
-            decodeR; next.reg(rd) := signExt((now.reg(rs1)(31, 0) * now.reg(rs2)(31, 0))(31, 0), XLEN)
-            specWb.is_inst := MULW(inst);
-        }
-      case "DIVW" =>
-        config.XLEN match {
-          case 64 =>
-            decodeR; next.reg(rd) := signExt(opDIV(now.reg(rs1)(31, 0), now.reg(rs2)(31, 0), 32), XLEN)
-            specWb.is_inst := DIVW(inst);
-        }
-      case "DIVUW" =>
-        config.XLEN match {
-          case 64 =>
-            decodeR; next.reg(rd) := signExt(opDIVU(now.reg(rs1)(31, 0), now.reg(rs2)(31, 0), 32), XLEN)
-            specWb.is_inst := DIVUW(inst);
-        }
-      case "REMW" =>
-        config.XLEN match {
-          case 64 =>
-            decodeR; next.reg(rd) := signExt(opREM(now.reg(rs1)(31, 0), now.reg(rs2)(31, 0), 32), XLEN)
-            specWb.is_inst := REMW(inst);
-        }
-      case "REMUW" =>
-        config.XLEN match {
-          case 64 =>
-            decodeR; next.reg(rd) := signExt(opREMU(now.reg(rs1)(31, 0), now.reg(rs2)(31, 0), 32), XLEN)
-            specWb.is_inst := REMUW(inst);
-        }
-      case _ =>
-        decodeR
-    }
-  }
 }
 
 // scalafmt: { maxColumn = 120 } (back to defaults)

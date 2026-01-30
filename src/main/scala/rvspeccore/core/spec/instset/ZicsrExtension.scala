@@ -85,85 +85,9 @@ trait ZicsrExtension
     isIllegalWrite
   }
 
-  def doRVZicsr: Unit = {
-    when(CSRRW(inst)) {
-      // t = CSRs[csr]; CSRs[csr] = x[rs1]; x[rd] = t
-      decodeI_Zicsr
-      when(!wen(csrAddr)) {
-        when(rd =/= 0.U) {
-          next.reg(rd) := zeroExt(csrRead(csrAddr), XLEN)
-          updateNextWrite(rd)
-        }
-        checkSrcImm(rs1)
-        csrWrite(csrAddr, now.reg(rs1))
-      }
-
-    }
-    when(CSRRS(inst)) {
-      // t = CSRs[csr]; CSRs[csr] = t | x[rs1]; x[rd] = t
-      decodeI_Zicsr
-      when(!wen(csrAddr, rs1 === 0.U)) {
-        next.reg(rd) := zeroExt(csrRead(csrAddr), XLEN)
-        updateNextWrite(rd)
-        checkSrcImm(rs1)
-        when(rs1 =/= 0.U) {
-          csrWrite(csrAddr, zeroExt(csrRead(csrAddr), XLEN) | now.reg(rs1))
-        }
-      }
-    }
-    when(CSRRC(inst)) {
-      // t = CSRs[csr]; CSRs[csr] = t &~x[rs1]; x[rd] = t
-      decodeI_Zicsr
-      when(!wen(csrAddr, rs1 === 0.U)) {
-        next.reg(rd) := zeroExt(csrRead(csrAddr), XLEN)
-        updateNextWrite(rd)
-        checkSrcImm(rs1)
-        when(rs1 =/= 0.U) {
-          // FIXME: 新写法wmask下导致的失灵 [待验证]
-          csrWrite(csrAddr, zeroExt(csrRead(csrAddr), XLEN) & ~now.reg(rs1))
-        }
-      }
-    }
-    when(CSRRWI(inst)) {
-      // x[rd] = CSRs[csr]; CSRs[csr] = zimm
-      decodeI_Zicsr
-      when(!wen(csrAddr)) {
-        when(rd =/= 0.U) {
-          next.reg(rd) := zeroExt(csrRead(csrAddr), XLEN)
-          updateNextWrite(rd)
-        }
-        csrWrite(csrAddr, zeroExt(rs1, XLEN))
-      }
-    }
-    when(CSRRSI(inst)) {
-      // t = CSRs[csr]; CSRs[csr] = t | zimm; x[rd] = t
-      decodeI_Zicsr
-      when(!wen(csrAddr, rs1 === 0.U)) {
-        next.reg(rd) := zeroExt(csrRead(csrAddr), XLEN)
-        updateNextWrite(rd)
-        // TODO: might have some exceptions when csrrs and csrrsi rs1 is zero?
-        when(rs1 =/= 0.U) {
-          csrWrite(csrAddr, zeroExt(csrRead(csrAddr), XLEN) | zeroExt(rs1, XLEN))
-        }
-      }
-    }
-    when(CSRRCI(inst)) {
-      // t = CSRs[csr]; CSRs[csr] = t &~zimm; x[rd] = t
-      decodeI_Zicsr
-      when(!wen(csrAddr, rs1 === 0.U)) {
-        next.reg(rd) := zeroExt(csrRead(csrAddr), XLEN)
-        updateNextWrite(rd)
-        when(rs1 =/= 0.U) {
-          // FIXME: 新写法wmask下导致的失灵？ [待验证]
-          csrWrite(csrAddr, zeroExt(csrRead(csrAddr), XLEN) & ~zeroExt(rs1, XLEN))
-        }
-      }
-    }
-  }
-
-  def doZicsrExtension(coreType: String): Unit = {
-    coreType match {
-      case "CSRRW" => 
+  def doZicsrExtension(singleInst: Inst): Unit = {
+    singleInst match {
+      case CSRRW =>
         decodeI_Zicsr
         when(!wen(csrAddr)) {
           when(rd =/= 0.U) {
@@ -173,8 +97,7 @@ trait ZicsrExtension
           checkSrcImm(rs1)
           csrWrite(csrAddr, now.reg(rs1))
         }
-        specWb.is_inst := CSRRW(inst);
-      case "CSRRS" =>
+      case CSRRS =>
         decodeI_Zicsr
         when(!wen(csrAddr, rs1 === 0.U)) {
           next.reg(rd) := zeroExt(csrRead(csrAddr), XLEN)
@@ -184,8 +107,7 @@ trait ZicsrExtension
             csrWrite(csrAddr, zeroExt(csrRead(csrAddr), XLEN) | now.reg(rs1))
           }
         }
-        specWb.is_inst := CSRRS(inst);
-      case "CSRRC" =>
+      case CSRRC =>
         decodeI_Zicsr
         when(!wen(csrAddr, rs1 === 0.U)) {
           next.reg(rd) := zeroExt(csrRead(csrAddr), XLEN)
@@ -196,8 +118,7 @@ trait ZicsrExtension
             csrWrite(csrAddr, zeroExt(csrRead(csrAddr), XLEN) & ~now.reg(rs1))
           }
         }
-        specWb.is_inst := CSRRC(inst);
-      case "CSRRWI" =>
+      case CSRRWI =>
         decodeI_Zicsr
         when(!wen(csrAddr)) {
           when(rd =/= 0.U) {
@@ -206,8 +127,7 @@ trait ZicsrExtension
           }
           csrWrite(csrAddr, zeroExt(rs1, XLEN))
         }
-        specWb.is_inst := CSRRWI(inst);
-      case "CSRRSI" =>
+      case CSRRSI =>
         decodeI_Zicsr
         when(!wen(csrAddr, rs1 === 0.U)) {
           next.reg(rd) := zeroExt(csrRead(csrAddr), XLEN)
@@ -217,8 +137,7 @@ trait ZicsrExtension
             csrWrite(csrAddr, zeroExt(csrRead(csrAddr), XLEN) | zeroExt(rs1, XLEN))
           }
         }
-        specWb.is_inst := CSRRSI(inst);
-      case "CSRRCI" =>
+      case CSRRCI =>
         decodeI_Zicsr
         when(!wen(csrAddr, rs1 === 0.U)) {
           next.reg(rd) := zeroExt(csrRead(csrAddr), XLEN)
@@ -228,8 +147,14 @@ trait ZicsrExtension
             csrWrite(csrAddr, zeroExt(csrRead(csrAddr), XLEN) & ~zeroExt(rs1, XLEN))
           }
         }
-        specWb.is_inst := CSRRCI(inst);
       case _ =>
     }
   }
+
+  def doRVZicsr: Unit = {
+    val rvzicsrInsts = Seq(CSRRW, CSRRS, CSRRC, CSRRWI, CSRRSI, CSRRCI)
+
+    rvzicsrInsts.map { rvzicsrInst => when(rvzicsrInst(inst)) { doZicsrExtension(rvzicsrInst) } }
+  }
+
 }

@@ -19,12 +19,15 @@ class ConnectHelperSpec extends AnyFlatSpec with ChiselScalatestTester {
 
     checker.io.result := DontCare
 
-    ConnectCheckerResult.setRegSource(state.reg)
-    val csr = ConnectCheckerResult.makeCSRSource()
+    ConnectHelper.setRegSource(state.reg)
+    val csr = ConnectHelper.makeCSRSource()
     csr := state.privilege.csr
 
+    val event = ConnectHelper.makeEventSource()
+    event := io.event
+
     if (checkMem) {
-      val memSource = ConnectCheckerResult.makeMemSource()
+      val memSource = ConnectHelper.makeMemSource()
       memSource.read.valid     := RegNext(io.mem.read.valid)
       memSource.read.addr      := RegNext(io.mem.read.addr)
       memSource.read.data      := RegNext(io.mem.read.data)
@@ -34,13 +37,13 @@ class ConnectHelperSpec extends AnyFlatSpec with ChiselScalatestTester {
       memSource.write.data     := RegNext(io.mem.write.data)
       memSource.write.memWidth := RegNext(io.mem.write.memWidth)
       if (checkTLB) {
-        val dtlbmemSource = ConnectCheckerResult.makeTLBSource(true)
-        val itlbmemSource = ConnectCheckerResult.makeTLBSource(false)
+        val dtlbmemSource = ConnectHelper.makeTLBSource(true)
+        val itlbmemSource = ConnectHelper.makeTLBSource(false)
         // TODO: need implemention
       }
     }
 
-    ConnectCheckerResult.setChecker(checker)
+    ConnectHelper.setChecker(checker)
   }
 
   it should "pass RiscvTests without mem check" in {

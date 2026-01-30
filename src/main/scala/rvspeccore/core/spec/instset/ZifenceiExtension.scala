@@ -24,16 +24,17 @@ trait ZifenceiExtensionInsts {
   *   - Chapter 3: “Zifencei” Instruction-Fetch Fence, Version 2.0
   */
 trait ZifenceiExtension extends BaseCore with CommonDecode with ZifenceiExtensionInsts {
-  def doRVZifencei: Unit = {
-    when(FENCE_I(inst)) { decodeI /* then do nothing for now */ }
-  }
 
-  def doZifenceiExecute(coreType: String): Unit = {
-    coreType match {
-      case "FENCE_I" => 
-        decodeI
-        specWb.is_inst := FENCE_I(inst);
-      case _ =>
+  def doZifenceiExecute(singleInst: Inst): Unit = {
+    singleInst match {
+      case FENCE_I => decodeI; /* then do nothing for now */
+      case _       =>
     }
   }
+
+  def doRVZifencei: Unit = {
+    val rvzifenceiInsts = Seq(FENCE_I)
+    rvzifenceiInsts.map { rvzifenceiInst => when(rvzifenceiInst(inst)) { doZifenceiExecute(rvzifenceiInst) } }
+  }
+
 }

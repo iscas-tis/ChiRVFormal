@@ -163,7 +163,7 @@ object RVB extends AssumeHelper with spec.instset.BExtensionInsts {
   )
 
   val zbkb = AssumeHelper(
-    List(rol, ror, rori, andn, orn, xnor, pack, packh, rev8, rev_b, zip, unzip),
+    List(rol, ror, rori, andn, orn, xnor, pack, packh, rev8, brev8, zip, unzip),
     List(rolw, roriw, rorw, packw)
   )
 
@@ -172,7 +172,7 @@ object RVB extends AssumeHelper with spec.instset.BExtensionInsts {
   )
 
   val zbkx = AssumeHelper(
-    List(xperm_b, xperm_n)
+    List(xperm8, xperm4)
   )
 
   val partition: Seq[AssumeHelper] = List(zba, zbb, zbc, zbs, zbkb, zbkc, zbkx)

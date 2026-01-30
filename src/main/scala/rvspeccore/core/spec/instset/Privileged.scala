@@ -46,40 +46,19 @@ trait PrivilegedExtension
     with CSRSupport
     with ExceptionSupport {
   def doRVPrivileged: Unit = {
-    // FIXME: need to decode more insts & clearify there actions(not do nothing....)
-    when(SRET(inst)) {
-      // printf("Is SRET:%x\n",inst)
-      decodeI
-      Sret()
-      /* then do nothing for now */
-    }
-    when(MRET(inst)) {
-      // printf("Is MRET:%x\n",inst)
-      decodeI
-      Mret()
-      /* then do nothing for now */
-    }
-    when(WFI(inst))        { decodeI /* then do nothing for now */ }
-    when(SFANCE_VMA(inst)) { decodeI /* then do nothing for now */ }
+    val privilegedInsts = Seq(SRET, MRET, WFI, SFANCE_VMA)
+
+    privilegedInsts.map(privilegedInst => when(privilegedInst(inst)) { doPrivileged(privilegedInst) })
   }
 
-  def doPrivileged(coreType: String): Unit = {
-    coreType match {
-      case "SRET" => 
-        decodeI
-        Sret()
-        specWb.is_inst := SRET(inst);
-      case "MRET" => 
-        decodeI
-        Mret()
-        specWb.is_inst := MRET(inst);
-      case "WFI" =>
-        decodeI
-        specWb.is_inst := WFI(inst);
-      case "SFANCE_VMA" =>
-        decodeI
-        specWb.is_inst := SFANCE_VMA(inst);
-      case _ =>
+  def doPrivileged(singleInst: Inst): Unit = {
+    singleInst match {
+      // FIXME: need to decode more insts & clearify there actions(not do nothing....)
+      case SRET       => decodeI; Sret(); /* then do nothing for now */
+      case MRET       => decodeI; Mret(); /* then do nothing for now */
+      case WFI        => decodeI;         /* then do nothing for now */
+      case SFANCE_VMA => decodeI;         /* then do nothing for now */
+      case _          =>
     }
   }
 }

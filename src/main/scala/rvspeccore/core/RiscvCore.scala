@@ -133,7 +133,7 @@ object State {
   }
 }
 
-class RiscvTrans(singleInstMode: Option[Inst])(implicit config: RVConfig) extends BaseCore with RVInstSet {
+class RiscvTrans(singleInstMode: Option[Inst] = None)(implicit config: RVConfig) extends BaseCore with RVInstSet {
   val io = IO(new Bundle {
     // Processor IO
     val inst     = Input(UInt(32.W))

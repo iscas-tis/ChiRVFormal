@@ -8,12 +8,12 @@ object Elaborate extends App {
     "--lowering-options=" + List(
       "disallowLocalVariables",
       "disallowPackedArrays",
-      "locationInfoStyle=wrapInAtSquareBracket",
+      "locationInfoStyle=wrapInAtSquareBracket"
     ).mkString(","),
-    "-default-layer-specialization=enable",
+    "-default-layer-specialization=enable"
   )
 
-  implicit val config = RVConfig(
+  implicit val config: RVConfig = RVConfig(
     XLEN = 64,
     extensions = "MCZifenceiZicsrZbaZbbZbcZbsZbkbZbkcZbkx",
     functions = Seq("Privileged", "TLB")
@@ -22,6 +22,6 @@ object Elaborate extends App {
   circt.stage.ChiselStage.emitSystemVerilogFile(
     new CheckerWithResult(checkMem = true, enableReg = true, singleInstMode = None),
     args,
-    firtoolOptions,
+    firtoolOptions
   )
 }

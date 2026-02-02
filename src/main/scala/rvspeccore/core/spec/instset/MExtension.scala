@@ -6,6 +6,8 @@ import chisel3.util._
 import rvspeccore.core.BaseCore
 import rvspeccore.core.spec._
 import rvspeccore.core.tool.BitTool._
+import rvspeccore.core.tool.CheckTool
+import rvspeccore.core.spec.instset.SizeOp.w
 
 /** “M” Standard Extension Instructions
   *
@@ -40,7 +42,7 @@ trait MExtensionInsts {
   *   - Chapter 7: “M” Standard Extension for Integer Multiplication and
   *     Division, Version 2.0
   */
-trait MExtension extends BaseCore with CommonDecode with MExtensionInsts {
+trait MExtension extends BaseCore with CommonDecode with MExtensionInsts with CheckTool { this: IBase =>
   // - Table 7.1: Semantics for division by zero and division overflow.
   // : L is the width of the operation in bits: XLEN for DIV[U] and REM[U],
   // : or 32 for DIV[U]W and REM[U]W.
@@ -79,37 +81,27 @@ trait MExtension extends BaseCore with CommonDecode with MExtensionInsts {
     )
   }
 
+  def opMULDIV(rd: UInt, rs1: UInt, rs2: UInt, func: (UInt, UInt) => UInt): Unit = {
+    updateDestReg(rd, func(getSrc1Reg(rs1), getSrc2Reg(rs2)))
+  }
+
   def doMExtension(singleInst: Inst): Unit = {
     singleInst match {
-      case MUL    => decodeR; next.reg(rd) := (now.reg(rs1) * now.reg(rs2))(XLEN - 1, 0)
-      case MULH   => decodeR; next.reg(rd) := (now.reg(rs1).asSInt * now.reg(rs2).asSInt).asUInt(XLEN * 2 - 1, XLEN)
-      case MULHSU => decodeR; next.reg(rd) := (now.reg(rs1).asSInt * now.reg(rs2)).asUInt(XLEN * 2 - 1, XLEN)
-      case MULHU  => decodeR; next.reg(rd) := (now.reg(rs1) * now.reg(rs2))(XLEN * 2 - 1, XLEN)
-      case DIV    => decodeR; next.reg(rd) := opDIV(now.reg(rs1), now.reg(rs2), XLEN)
-      case DIVU   => decodeR; next.reg(rd) := opDIVU(now.reg(rs1), now.reg(rs2), XLEN)
-      case REM    => decodeR; next.reg(rd) := opREM(now.reg(rs1), now.reg(rs2), XLEN)
-      case REMU   => decodeR; next.reg(rd) := opREMU(now.reg(rs1), now.reg(rs2), XLEN)
-      case MULW =>
-        config.XLEN match {
-          case 64 => decodeR; next.reg(rd) := signExt((now.reg(rs1)(31, 0) * now.reg(rs2)(31, 0))(31, 0), XLEN)
-        }
-      case DIVW =>
-        config.XLEN match {
-          case 64 => decodeR; next.reg(rd) := signExt(opDIV(now.reg(rs1)(31, 0), now.reg(rs2)(31, 0), 32), XLEN)
-        }
-      case DIVUW =>
-        config.XLEN match {
-          case 64 => decodeR; next.reg(rd) := signExt(opDIVU(now.reg(rs1)(31, 0), now.reg(rs2)(31, 0), 32), XLEN)
-        }
-      case REMW =>
-        config.XLEN match {
-          case 64 => decodeR; next.reg(rd) := signExt(opREM(now.reg(rs1)(31, 0), now.reg(rs2)(31, 0), 32), XLEN)
-        }
-      case REMUW =>
-        config.XLEN match {
-          case 64 => decodeR; next.reg(rd) := signExt(opREMU(now.reg(rs1)(31, 0), now.reg(rs2)(31, 0), 32), XLEN)
-        }
-      case _ =>
+      case MUL                       => decodeR; opMULDIV(rd, rs1, rs2, (a, b) => (a * b)(XLEN - 1, 0))
+      case MULH                      => decodeR; opMULDIV(rd, rs1, rs2, (a, b) => (a.asSInt * b.asSInt).asUInt(XLEN * 2 - 1, XLEN))
+      case MULHSU                    => decodeR; opMULDIV(rd, rs1, rs2, (a, b) => (a.asSInt * b).asUInt(XLEN * 2 - 1, XLEN))
+      case MULHU                     => decodeR; opMULDIV(rd, rs1, rs2, (a, b) => (a * b)(XLEN * 2 - 1, XLEN))
+      case DIV                       => decodeR; opMULDIV(rd, rs1, rs2, (a, b) => opDIV(a, b, XLEN))
+      case DIVU                      => decodeR; opMULDIV(rd, rs1, rs2, (a, b) => opDIVU(a, b, XLEN))
+      case REM                       => decodeR; opMULDIV(rd, rs1, rs2, (a, b) => opREM(a, b, XLEN))
+      case REMU                      => decodeR; opMULDIV(rd, rs1, rs2, (a, b) => opREMU(a, b, XLEN))
+      case MULW if config.XLEN == 64 => decodeR; opMULDIV(rd, rs1, rs2, (a, b) => signExt((a(31, 0) * b(31, 0))(31, 0), XLEN))
+      case DIVW if config.XLEN == 64 => decodeR; opMULDIV(rd, rs1, rs2, (a, b) => signExt(opDIV(a(31, 0), b(31, 0), 32), XLEN))
+
+      case DIVUW if config.XLEN == 64 => decodeR; opMULDIV(rd, rs1, rs2, (a, b) => signExt(opDIVU(a(31, 0), b(31, 0), 32), XLEN))
+      case REMW if config.XLEN == 64  => decodeR; opMULDIV(rd, rs1, rs2, (a, b) => signExt(opREM(a(31, 0), b(31, 0), 32), XLEN))
+      case REMUW if config.XLEN == 64 => decodeR; opMULDIV(rd, rs1, rs2, (a, b) => signExt(opREMU(a(31, 0), b(31, 0), 32), XLEN))
+      case _                          =>
     }
   }
 

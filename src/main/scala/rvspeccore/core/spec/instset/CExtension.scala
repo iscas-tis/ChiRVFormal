@@ -6,6 +6,8 @@ import chisel3.util._
 import rvspeccore.core.BaseCore
 import rvspeccore.core.spec._
 import rvspeccore.core.tool.BitTool._
+import rvspeccore.core.tool.CheckTool
+import rvspeccore.core.tool.LoadStore
 
 trait CExtensionInsts {
   val rdNotZero    = (inst: UInt, xlen: Int) => { inst(11, 7) =/= 0.U }
@@ -128,7 +130,7 @@ trait CDecode extends BaseCore with CommonDecode {
   *   - Chapter 16: “C” Standard Extension for Compressed Instructions, Version
   *     2.0
   */
-trait CExtension extends BaseCore with CDecode with CExtensionInsts { this: IBase =>
+trait CExtension extends BaseCore with CDecode with CExtensionInsts with LoadStore with CheckTool { this: IBase =>
 
   def cat01(x: UInt): UInt = Cat("b01".U(2.W), x)
 
@@ -136,20 +138,20 @@ trait CExtension extends BaseCore with CDecode with CExtensionInsts { this: IBas
     singleInst match {
       case C_LWSP =>
         decodeCI
-        imm          := zeroExt(reorder(5, (4, 2), (7, 6))(inst, 12, (6, 2)), XLEN)
-        next.reg(rd) := signExt(memRead(now.reg(2.U) + imm, 32.U)(31, 0), XLEN)
+        imm := zeroExt(reorder(5, (4, 2), (7, 6))(inst, 12, (6, 2)), XLEN)
+        updateDestReg(rd, signExt(memRead(getSrc1Reg(2.U) + imm, 32.U)(31, 0), XLEN))
       case C_SWSP =>
         decodeCSS
         imm := zeroExt(reorder((5, 2), (7, 6))(inst, (12, 7)), XLEN)
-        memWrite(now.reg(2.U) + imm, 32.U, now.reg(rs2)(31, 0))
+        memWrite(getSrc1Reg(2.U) + imm, 32.U, getSrc2Reg(rs2)(31, 0))
       case C_LW =>
         decodeCL
-        imm                  := zeroExt(reorder((5, 3), 2, (6, 6))(inst, (12, 10), (6, 5)), XLEN)
-        next.reg(cat01(rdP)) := signExt(memRead(now.reg(cat01(rs1P)) + imm, 32.U)(31, 0), XLEN)
+        imm := zeroExt(reorder((5, 3), 2, (6, 6))(inst, (12, 10), (6, 5)), XLEN)
+        updateDestReg(cat01(rdP), signExt(memRead(getSrc1Reg(cat01(rs1P)) + imm, 32.U)(31, 0), XLEN))
       case C_SW =>
         decodeCS
         imm := zeroExt(reorder((5, 3), 2, 6)(inst, (12, 10), (6, 5)), XLEN)
-        memWrite(now.reg(cat01(rs1P)) + imm, 32.U, now.reg(cat01(rs2P)))
+        memWrite(getSrc1Reg(cat01(rs1P)) + imm, 32.U, getSrc2Reg(cat01(rs2P)))
       case C_J =>
         decodeCJ
         imm               := signExt(reorder(11, 4, (9, 8), 10, 6, 7, (3, 1), 5)(inst, (12, 2)), XLEN)
@@ -160,101 +162,113 @@ trait CExtension extends BaseCore with CDecode with CExtensionInsts { this: IBas
         imm               := signExt(reorder(11, 4, (9, 8), 10, 6, 7, (3, 1), 5)(inst, (12, 2)), XLEN)
         global_data.setpc := true.B
         next.pc           := now.pc + imm
-        next.reg(1.U)     := now.pc + 2.U
+        updateDestReg(1.U, now.pc + 2.U)
       case C_JR =>
         decodeCR
         global_data.setpc := true.B
         // setting the least-significant to zero according to JALR in RVI
-        next.pc := Cat(now.reg(rs1)(XLEN - 1, 1), 0.U(1.W))
+        next.pc := Cat(getSrc1Reg(rs1)(XLEN - 1, 1), 0.U(1.W))
       case C_JALR =>
         decodeCR
         global_data.setpc := true.B
         // setting the least-significant to zero according to JALR in RVI
-        next.pc       := Cat(now.reg(rs1)(XLEN - 1, 1), 0.U(1.W))
-        next.reg(1.U) := now.pc + 2.U
+        next.pc := Cat(getSrc1Reg(rs1)(XLEN - 1, 1), 0.U(1.W))
+        updateDestReg(1.U, now.pc + 2.U)
       case C_BEQZ =>
         decodeCB
         imm := signExt(reorder(8, (4, 3), (7, 6), (2, 1), 5)(inst, (12, 10), (6, 2)), XLEN)
-        when(now.reg(cat01(rs1P)) === 0.U) {
+        when(getSrc1Reg(cat01(rs1P)) === 0.U) {
           global_data.setpc := true.B
           next.pc           := now.pc + imm
         }
       case C_BNEZ =>
         decodeCB
         imm := signExt(reorder(8, (4, 3), (7, 6), (2, 1), 5)(inst, (12, 10), (6, 2)), XLEN)
-        when(now.reg(cat01(rs1P)) =/= 0.U) {
+        when(getSrc1Reg(cat01(rs1P)) =/= 0.U) {
           global_data.setpc := true.B
           next.pc           := now.pc + imm
         }
       case C_LI =>
         decodeCI
-        imm          := signExt(reorder(5, (4, 0))(inst, 12, (6, 2)), XLEN)
-        next.reg(rd) := imm
+        imm := signExt(reorder(5, (4, 0))(inst, 12, (6, 2)), XLEN)
+        updateDestReg(rd, imm)
       case C_LUI =>
         decodeCI
         val nzimm_C_LUI = signExt(reorder(17, (16, 12))(inst, 12, (6, 2)), XLEN)
-        next.reg(rd) := nzimm_C_LUI
+        updateDestReg(rd, nzimm_C_LUI)
       case C_ADDI =>
         decodeCI
         val nzimm_C_ADDI = signExt(reorder(5, (4, 0))(inst, 12, (6, 2)), XLEN)
-        next.reg(rd) := now.reg(rd) + nzimm_C_ADDI
+        updateDestReg(rd, getSrc1Reg(rd) + nzimm_C_ADDI)
       case C_ADDI16SP =>
         decodeCI
         val nzimm_C_ADDI16SP = signExt(reorder(9, 4, 6, (8, 7), 5)(inst, 12, (6, 2)), XLEN)
-        next.reg(2.U) := now.reg(2.U) + nzimm_C_ADDI16SP
+        updateDestReg(2.U, getSrc1Reg(2.U) + nzimm_C_ADDI16SP)
       case C_ADDI4SPN =>
         decodeCIW
         val nzimm_C_ADDI4SPN = zeroExt(reorder((5, 4), (9, 6), 2, 3)(inst, (12, 5)), XLEN)
-        next.reg(cat01(rdP)) := now.reg(2.U) + nzimm_C_ADDI4SPN
+        updateDestReg(cat01(rdP), getSrc1Reg(2.U) + nzimm_C_ADDI4SPN)
       case C_SLLI =>
         decodeCI
-        imm          := reorder(5, (4, 0))(inst, 12, (6, 2))
-        next.reg(rd) := now.reg(rd) << imm(5, 0)
+        imm := reorder(5, (4, 0))(inst, 12, (6, 2))
+        updateDestReg(rd, getSrc1Reg(rd) << imm(5, 0))
       case C_SRLI =>
         decodeCB
-        imm                  := reorder(5, (4, 0))(inst, 12, (6, 2))
-        next.reg(cat01(rdP)) := now.reg(cat01(rdP)) >> imm(5, 0)
+        imm := reorder(5, (4, 0))(inst, 12, (6, 2))
+        updateDestReg(cat01(rdP), getSrc1Reg(cat01(rdP)) >> imm(5, 0))
       case C_SRAI =>
         decodeCB
-        imm                  := reorder(5, (4, 0))(inst, 12, (6, 2))
-        next.reg(cat01(rdP)) := (now.reg(cat01(rdP)).asSInt >> imm(5, 0)).asUInt
+        imm := reorder(5, (4, 0))(inst, 12, (6, 2))
+        updateDestReg(cat01(rdP), (getSrc1Reg(cat01(rdP)).asSInt >> imm(5, 0)).asUInt)
       case C_ANDI =>
         decodeCB
-        imm                  := signExt(reorder(5, (4, 0))(inst, 12, (6, 2)), XLEN)
-        next.reg(cat01(rdP)) := now.reg(cat01(rdP)) & imm
-      case C_MV  => decodeCR; next.reg(rd) := now.reg(0.U) + now.reg(rs2)
-      case C_ADD => decodeCR; next.reg(rd) := now.reg(rd) + now.reg(rs2)
-      case C_AND => decodeCA; next.reg(cat01(rdP)) := now.reg(cat01(rdP)) & now.reg(cat01(rs2P))
-      case C_OR  => decodeCA; next.reg(cat01(rdP)) := now.reg(cat01(rdP)) | now.reg(cat01(rs2P))
-      case C_XOR => decodeCA; next.reg(cat01(rdP)) := now.reg(cat01(rdP)) ^ now.reg(cat01(rs2P))
-      case C_SUB => decodeCA; next.reg(cat01(rdP)) := now.reg(cat01(rdP)) - now.reg(cat01(rs2P))
+        imm := signExt(reorder(5, (4, 0))(inst, 12, (6, 2)), XLEN)
+        updateDestReg(cat01(rdP), getSrc1Reg(cat01(rdP)) & imm)
+      case C_MV =>
+        decodeCR
+        updateDestReg(rd, getSrc2Reg(rs2))
+      case C_ADD =>
+        decodeCR
+        updateDestReg(rd, getSrc1Reg(rd) + getSrc2Reg(rs2))
+      case C_AND =>
+        decodeCA
+        updateDestReg(cat01(rdP), getSrc1Reg(cat01(rdP)) & getSrc2Reg(cat01(rs2P)))
+      case C_OR =>
+        decodeCA
+        updateDestReg(cat01(rdP), getSrc1Reg(cat01(rdP)) | getSrc2Reg(cat01(rs2P)))
+      case C_XOR =>
+        decodeCA
+        updateDestReg(cat01(rdP), getSrc1Reg(cat01(rdP)) ^ getSrc2Reg(cat01(rs2P)))
+      case C_SUB =>
+        decodeCA
+        updateDestReg(cat01(rdP), getSrc1Reg(cat01(rdP)) - getSrc2Reg(cat01(rs2P)))
       case C_NOP => decodeCI /* then do nothing */
       case C_LDSP if config.XLEN == 64 =>
         decodeCI
-        imm          := zeroExt(reorder(5, (4, 3), (8, 6))(inst, 12, (6, 2)), XLEN)
-        next.reg(rd) := signExt(memRead(now.reg(2.U) + imm, 64.U)(63, 0), XLEN)
+        imm := zeroExt(reorder(5, (4, 3), (8, 6))(inst, 12, (6, 2)), XLEN)
+        updateDestReg(rd, signExt(memRead(getSrc1Reg(2.U) + imm, 64.U)(63, 0), XLEN))
       case C_SDSP if config.XLEN == 64 =>
         decodeCSS
         imm := zeroExt(reorder((5, 3), (8, 6))(inst, (12, 7)), XLEN)
-        memWrite(now.reg(2.U) + imm, 64.U, now.reg(rs2)(63, 0))
+        memWrite(getSrc1Reg(2.U) + imm, 64.U, getSrc2Reg(rs2)(63, 0))
       case C_LD if config.XLEN == 64 =>
         decodeCL
-        imm                  := zeroExt(reorder((5, 3), (7, 6))(inst, (12, 10), (6, 5)), XLEN)
-        next.reg(cat01(rdP)) := signExt(memRead(now.reg(cat01(rs1P)) + imm, 64.U)(63, 0), XLEN)
+        imm := zeroExt(reorder((5, 3), (7, 6))(inst, (12, 10), (6, 5)), XLEN)
+        updateDestReg(cat01(rdP), signExt(memRead(getSrc1Reg(cat01(rs1P)) + imm, 64.U)(63, 0), XLEN))
       case C_SD if config.XLEN == 64 =>
         decodeCS
         imm := zeroExt(reorder((5, 3), (7, 6))(inst, (12, 10), (6, 5)), XLEN)
-        memWrite(now.reg(cat01(rs1P)), 64.U, now.reg(cat01(rs2P)))
+        memWrite(getSrc1Reg(cat01(rs1P)), 64.U, getSrc2Reg(cat01(rs2P)))
       case C_ADDIW if config.XLEN == 64 =>
         decodeCI
-        imm          := signExt(reorder(5, (4, 0))(inst, 12, (6, 2)), XLEN)
-        next.reg(rd) := signExt((now.reg(rd) + imm)(31, 0), XLEN)
+        imm := signExt(reorder(5, (4, 0))(inst, 12, (6, 2)), XLEN)
+        updateDestReg(rd, signExt((getSrc1Reg(rd) + imm)(31, 0), XLEN))
       case C_ADDW if config.XLEN == 64 =>
         decodeCA
-        next.reg(cat01(rdP)) := signExt(now.reg(cat01(rdP))(31, 0) + now.reg(cat01(rs2P))(31, 0), XLEN)
+        updateDestReg(cat01(rdP), signExt(getSrc1Reg(cat01(rdP))(31, 0) + getSrc2Reg(cat01(rs2P))(31, 0), XLEN))
       case C_SUBW if config.XLEN == 64 =>
         decodeCA
-        next.reg(cat01(rdP)) := signExt(now.reg(cat01(rdP))(31, 0) - now.reg(cat01(rs2P))(31, 0), XLEN)
+        updateDestReg(cat01(rdP), signExt(getSrc1Reg(cat01(rdP))(31, 0) - getSrc2Reg(cat01(rs2P))(31, 0), XLEN))
       case _ =>
     }
   }

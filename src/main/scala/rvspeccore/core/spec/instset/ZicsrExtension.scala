@@ -69,7 +69,7 @@ trait ZicsrExtension
     with ZicsrExtensionInsts
     with CSRSupport
     with ExceptionSupport
-    with CheckTool {
+    with CheckTool { this: IBase =>
   def wen(addr: UInt, justRead: Bool = false.B): Bool = {
     // TODO: has a reference to document?
     // TODO: what is wen mean?
@@ -91,47 +91,39 @@ trait ZicsrExtension
         decodeI_Zicsr
         when(!wen(csrAddr)) {
           when(rd =/= 0.U) {
-            next.reg(rd) := zeroExt(csrRead(csrAddr), XLEN)
-            updateNextWrite(rd)
+            updateDestReg(rd, zeroExt(csrRead(csrAddr), XLEN))
           }
-          checkSrcImm(rs1)
-          csrWrite(csrAddr, now.reg(rs1))
+          csrWrite(csrAddr, getSrc1Reg(rs1))
         }
       case CSRRS =>
         decodeI_Zicsr
         when(!wen(csrAddr, rs1 === 0.U)) {
-          next.reg(rd) := zeroExt(csrRead(csrAddr), XLEN)
-          updateNextWrite(rd)
-          checkSrcImm(rs1)
+          updateDestReg(rd, zeroExt(csrRead(csrAddr), XLEN))
           when(rs1 =/= 0.U) {
-            csrWrite(csrAddr, zeroExt(csrRead(csrAddr), XLEN) | now.reg(rs1))
+            csrWrite(csrAddr, zeroExt(csrRead(csrAddr), XLEN) | getSrc1Reg(rs1))
           }
         }
       case CSRRC =>
         decodeI_Zicsr
         when(!wen(csrAddr, rs1 === 0.U)) {
-          next.reg(rd) := zeroExt(csrRead(csrAddr), XLEN)
-          updateNextWrite(rd)
-          checkSrcImm(rs1)
+          updateDestReg(rd, zeroExt(csrRead(csrAddr), XLEN))
           when(rs1 =/= 0.U) {
             // FIXME: 新写法wmask下导致的失灵 [待验证]
-            csrWrite(csrAddr, zeroExt(csrRead(csrAddr), XLEN) & ~now.reg(rs1))
+            csrWrite(csrAddr, zeroExt(csrRead(csrAddr), XLEN) & ~getSrc1Reg(rs1))
           }
         }
       case CSRRWI =>
         decodeI_Zicsr
         when(!wen(csrAddr)) {
           when(rd =/= 0.U) {
-            next.reg(rd) := zeroExt(csrRead(csrAddr), XLEN)
-            updateNextWrite(rd)
+            updateDestReg(rd, zeroExt(csrRead(csrAddr), XLEN))
           }
           csrWrite(csrAddr, zeroExt(rs1, XLEN))
         }
       case CSRRSI =>
         decodeI_Zicsr
         when(!wen(csrAddr, rs1 === 0.U)) {
-          next.reg(rd) := zeroExt(csrRead(csrAddr), XLEN)
-          updateNextWrite(rd)
+          updateDestReg(rd, zeroExt(csrRead(csrAddr), XLEN))
           // TODO: might have some exceptions when csrrs and csrrsi rs1 is zero?
           when(rs1 =/= 0.U) {
             csrWrite(csrAddr, zeroExt(csrRead(csrAddr), XLEN) | zeroExt(rs1, XLEN))
@@ -140,8 +132,7 @@ trait ZicsrExtension
       case CSRRCI =>
         decodeI_Zicsr
         when(!wen(csrAddr, rs1 === 0.U)) {
-          next.reg(rd) := zeroExt(csrRead(csrAddr), XLEN)
-          updateNextWrite(rd)
+          updateDestReg(rd, zeroExt(csrRead(csrAddr), XLEN))
           when(rs1 =/= 0.U) {
             // FIXME: 新写法wmask下导致的失灵？ [待验证]
             csrWrite(csrAddr, zeroExt(csrRead(csrAddr), XLEN) & ~zeroExt(rs1, XLEN))

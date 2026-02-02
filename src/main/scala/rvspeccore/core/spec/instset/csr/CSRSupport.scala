@@ -68,7 +68,7 @@ trait CSRSupport extends BaseCore with ExceptionSupport with CheckTool {
           // printf("[Debug]Find ADDR, %x %x\n", (info.wfn != null).B, (info.wmask != UnwritableMask).B)
           if (info.wfn.isDefined && info.wmask(XLEN) != UnwritableMask) {
             nextCSR := info.wfn.get(XLEN)((nowCSR & ~info.wmask(XLEN)) | (data & info.wmask(XLEN)))
-            updateNextCsrWrite(addr)
+            updateDestCsr(addr)
             // printf("[Debug]CSR_Write:(Addr: %x, nowCSR: %x, nextCSR: %x)\n", addr, nowCSR, nextCSR)
           } else {
             // if write, this will has exception

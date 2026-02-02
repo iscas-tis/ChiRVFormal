@@ -54,12 +54,12 @@ class CheckerWithResultSpec extends AnyFlatSpec with ChiselScalatestTester {
 
   behavior of "CheckerWithResult"
 
-  it should "pass RiscvTests without mem check" in {
+  it should "pass RiscvTests[mem check: off, reg delay: off]" in {
     val tests = Seq(
       RiscvTests("rv64ui", "rv64ui-addi.hex")
     )
     tests.foreach { testFile =>
-      test(new CoreTester(new TestCore(false), testFile.getCanonicalPath())) { c =>
+      test(new CoreTester(new TestCore(false, false), testFile.getCanonicalPath())) { c =>
         RiscvTests.stepTest(c, RiscvTests.maxStep)
         RiscvTests.checkReturn(c)
       }
@@ -71,8 +71,8 @@ class CheckerWithResultSpec extends AnyFlatSpec with ChiselScalatestTester {
 
   tests.foreach { testCase =>
     RiscvTests(testCase).foreach(f =>
-      it should s"pass RiscvTests with mem check @${f.getName}" in {
-        test(new CoreTester(new TestCore, f.getCanonicalPath())) { c =>
+      it should s"pass RiscvTests[mem check: on, reg delay: off] @${f.getName}" in {
+        test(new CoreTester(new TestCore(true, false), f.getCanonicalPath())) { c =>
           RiscvTests.stepTest(c, RiscvTests.maxStep)
           RiscvTests.checkReturn(c)
         }
@@ -82,7 +82,7 @@ class CheckerWithResultSpec extends AnyFlatSpec with ChiselScalatestTester {
 
   tests.foreach { testCase =>
     RiscvTests(testCase).foreach(f =>
-      it should s"pass RiscvTests with reg delay @${f.getName}" in {
+      it should s"pass RiscvTests[mem check: on, reg delay: on] @${f.getName}" in {
         test(new CoreTester(new TestCore(true, true), f.getCanonicalPath())) { c =>
           RiscvTests.stepTest(c, RiscvTests.maxStep)
           RiscvTests.checkReturn(c)
@@ -138,12 +138,12 @@ class CheckerWithWBSpec extends AnyFlatSpec with ChiselScalatestTester {
 
   behavior of "CheckerWithWB"
 
-  it should "pass RiscvTests without mem check" in {
+  it should "pass RiscvTests[mem check: off, reg delay: off]" in {
     val tests = Seq(
       RiscvTests("rv64ui", "rv64ui-addi.hex")
     )
     tests.foreach { testFile =>
-      test(new CoreTester(new TestCore(false), testFile.getCanonicalPath())) { c =>
+      test(new CoreTester(new TestCore(false, false), testFile.getCanonicalPath())) { c =>
         RiscvTests.stepTest(c, RiscvTests.maxStep)
         RiscvTests.checkReturn(c)
       }
@@ -155,8 +155,8 @@ class CheckerWithWBSpec extends AnyFlatSpec with ChiselScalatestTester {
 
   tests.foreach { testCase =>
     RiscvTests(testCase).foreach(f =>
-      it should s"pass RiscvTests with mem check @${f.getName}" in {
-        test(new CoreTester(new TestCore, f.getCanonicalPath())) { c =>
+      it should s"pass RiscvTests[mem check: on, reg delay: off] @${f.getName}" in {
+        test(new CoreTester(new TestCore(true, false), f.getCanonicalPath())).withAnnotations(Seq(WriteVcdAnnotation)) { c =>
           RiscvTests.stepTest(c, RiscvTests.maxStep)
           RiscvTests.checkReturn(c)
         }
@@ -166,7 +166,7 @@ class CheckerWithWBSpec extends AnyFlatSpec with ChiselScalatestTester {
 
   tests.foreach { testCase =>
     RiscvTests(testCase).foreach(f =>
-      it should s"pass RiscvTests with reg delay @${f.getName}" in {
+      it should s"pass RiscvTests[mem check: on, reg delay: on] @${f.getName}" in {
         test(new CoreTester(new TestCore(true, true), f.getCanonicalPath())) { c =>
           RiscvTests.stepTest(c, RiscvTests.maxStep)
           RiscvTests.checkReturn(c)

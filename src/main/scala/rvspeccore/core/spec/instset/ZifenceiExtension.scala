@@ -23,7 +23,7 @@ trait ZifenceiExtensionInsts {
   *   - riscv-spec-20191213
   *   - Chapter 3: “Zifencei” Instruction-Fetch Fence, Version 2.0
   */
-trait ZifenceiExtension extends BaseCore with CommonDecode with ZifenceiExtensionInsts {
+trait ZifenceiExtension extends BaseCore with CommonDecode with ZifenceiExtensionInsts { this: IBase =>
 
   def doZifenceiExecute(singleInst: Inst): Unit = {
     singleInst match {

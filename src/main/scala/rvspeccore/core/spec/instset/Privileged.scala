@@ -44,7 +44,7 @@ trait PrivilegedExtension
     with CommonDecode
     with PrivilegedInsts
     with CSRSupport
-    with ExceptionSupport {
+    with ExceptionSupport { this: IBase =>
   def doRVPrivileged: Unit = {
     val privilegedInsts = Seq(SRET, MRET, WFI, SFANCE_VMA)
 

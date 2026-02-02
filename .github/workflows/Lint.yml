@@ -1,6 +1,6 @@
 name: Code Lint
 
-on: [pull_request]
+on: [push, pull_request]
 
 jobs:
   format-check:
@@ -8,12 +8,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
-      - name: Setup Scala
-        uses: olafurpg/setup-scala@v10
-        with:
-          java-version: adopt@1.8
+        uses: actions/checkout@v6
       - name: Cache Scala
-        uses: coursier/cache-action@v5
+        uses: coursier/cache-action@v7
+      - name: Setup Scala
+        uses: coursier/setup-action@v1
+        with:
+          jvm: adopt:1.8
+          apps: sbt
       - name: Format Check
         run: sbt scalafmtCheckAll

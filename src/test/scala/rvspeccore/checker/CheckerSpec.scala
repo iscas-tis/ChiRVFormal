@@ -156,9 +156,10 @@ class CheckerWithWBSpec extends AnyFlatSpec with ChiselScalatestTester {
   tests.foreach { testCase =>
     RiscvTests(testCase).foreach(f =>
       it should s"pass RiscvTests[mem check: on, reg delay: off] @${f.getName}" in {
-        test(new CoreTester(new TestCore(true, false), f.getCanonicalPath())).withAnnotations(Seq(WriteVcdAnnotation)) { c =>
-          RiscvTests.stepTest(c, RiscvTests.maxStep)
-          RiscvTests.checkReturn(c)
+        test(new CoreTester(new TestCore(true, false), f.getCanonicalPath())).withAnnotations(Seq(WriteVcdAnnotation)) {
+          c =>
+            RiscvTests.stepTest(c, RiscvTests.maxStep)
+            RiscvTests.checkReturn(c)
         }
       }
     )

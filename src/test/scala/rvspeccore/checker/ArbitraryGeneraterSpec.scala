@@ -10,8 +10,8 @@ class TestArbitraryRegFileModule(hasBug: Boolean) extends Module {
   val io = IO(new Bundle {
     val rf = Output(Vec(32, UInt(64.W)))
   })
-  io.rf := ArbitraryRegFile.gen
   ArbitraryRegFile.init
+  io.rf := ArbitraryRegFile.gen
 
   if (hasBug) {
     // this assertion should fail because the rf(1) is arbitrary, could be not 0.U

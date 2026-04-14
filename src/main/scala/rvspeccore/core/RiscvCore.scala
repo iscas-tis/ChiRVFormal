@@ -3,11 +3,9 @@ package rvspeccore.core
 import chisel3._
 import chisel3.util._
 import spec._
-import spec.instset.csr.{CSR, CSRInfoSignal, EventSig, SatpStruct}
+import spec.instset._
+import spec.instset.csr._
 import rvspeccore.checker.ArbitraryRegFile
-import rvspeccore.core.tool.BitTool._
-import rvspeccore.core.spec.instset.csr._
-import rvspeccore.core.spec.instset._
 
 abstract class BaseCore()(implicit val config: RVConfig) extends Module {
   implicit val XLEN: Int = config.XLEN
@@ -17,38 +15,30 @@ abstract class BaseCore()(implicit val config: RVConfig) extends Module {
   val next = Wire(State())
   // IO ports
   val iFetchpc = Wire(UInt(XLEN.W))
-  val mem      = Wire(new MemIO)
-  val tlb      = if (config.functions.tlb) Some(Wire(new TLBIO)) else None
-  val specWb   = Wire(new SpecWbIO)
-  // Global signals
-  val inst        = Wire(UInt(32.W))
-  val global_data = Wire(new GlobalData) // TODO: GlobalData only has setpc? event, iFetchpc?
-  val event       = Wire(new EventSig)
+  val mem      = Wire(MemIO())
+  val tlb      = if (config.functions.tlb) Some(Wire(TLBIO())) else None
+  val commit   = Wire(CommitIO())
+  // internal signals
+  val inst  = Wire(UInt(32.W))
+  val setpc = Wire(Bool())
 }
-class GlobalData extends Bundle {
-  val setpc = Bool()
-}
+class CommitIO(implicit XLEN: Int) extends Bundle {
+  val exception = Bool()
 
-class WbIO()(implicit XLEN: Int) extends Bundle {
-  val inst    = Input(UInt(32.W))
-  val valid   = Input(Bool())
-  val rs1     = Input(UInt(5.W))
-  val rs2     = Input(UInt(5.W))
-  val rs1Data = Input(UInt(XLEN.W))
-  val rs2Data = Input(UInt(XLEN.W))
-  val csrAddr = Input(UInt(12.W))
-}
+  val readRs1 = Bool()
+  val rs1Addr = UInt(5.W)
+  val readRs2 = Bool()
+  val rs2Addr = UInt(5.W)
 
-class SpecWbIO(implicit XLEN: Int) extends Bundle {
-  val rd_addr  = UInt(5.W)
-  val rd_data  = UInt(XLEN.W)
-  val rd_en    = Bool()
-  val csr_addr = UInt(12.W)
-  val csr_wr   = Bool()
-  val rs1_addr = UInt(5.W)
-  val rs2_addr = UInt(5.W)
-  val checkrs1 = Bool()
-  val checkrs2 = Bool()
+  val rdAddr = UInt(5.W)
+  val rdData = UInt(XLEN.W)
+
+  val csrWr    = Bool()
+  val csrAddr  = UInt(12.W)
+  val csrNdata = UInt(XLEN.W)
+}
+object CommitIO {
+  def apply()(implicit XLEN: Int): CommitIO = new CommitIO
 }
 
 class ReadMemIO()(implicit XLEN: Int) extends Bundle {
@@ -69,64 +59,56 @@ class MemIO()(implicit XLEN: Int) extends Bundle {
   val read  = new ReadMemIO
   val write = new WriteMemIO
 }
+object MemIO {
+  def apply()(implicit XLEN: Int): MemIO = new MemIO
+}
 
 class TLBIO()(implicit XLEN: Int) extends Bundle {
   val Anotherread  = Vec(3 + 3, new ReadMemIO())
   val Anotherwrite = Vec(3, new WriteMemIO())
 }
-
-class Internal() extends Bundle {
-  val privilegeMode = UInt(2.W)
-}
-object Internal {
-  def apply(): Internal = new Internal
-  def wireInit(): Internal = {
-    val internal = Wire(new Internal)
-    internal.privilegeMode := 0x3.U
-    internal
-  }
+object TLBIO {
+  def apply()(implicit XLEN: Int): TLBIO = new TLBIO
 }
 
 // This contained registers about privileged extensions
-class PrivilegedState()(implicit XLEN: Int, config: RVConfig) extends Bundle {
-  val csr = CSR()
-
-  val internal = Internal()
+class PrivilegedState()(implicit config: RVConfig) extends Bundle {
+  val mode = UInt(2.W)
+  val csr  = CSR()
 }
 
 object PrivilegedState {
-  def apply()(implicit XLEN: Int, config: RVConfig): PrivilegedState = new PrivilegedState
-  def wireInit()(implicit XLEN: Int, config: RVConfig): PrivilegedState = {
+  def apply()(implicit config: RVConfig): PrivilegedState = new PrivilegedState
+  def wireInit()(implicit config: RVConfig): PrivilegedState = {
     val privilegedState = Wire(new PrivilegedState)
-    privilegedState.csr := CSR.wireInit()
 
-    privilegedState.internal := Internal.wireInit()
+    privilegedState.mode := PrivilegeLevel.initLevel.asUInt
+    privilegedState.csr  := CSR.wireInit()
 
     privilegedState
   }
 }
 
 // This extends BaseState with rf and pc
-class State()(implicit XLEN: Int, config: RVConfig) extends Bundle {
+class State()(implicit config: RVConfig) extends Bundle {
+  val XLEN: Int = config.XLEN
 
-  val reg = Vec(32, UInt(XLEN.W))
-  val pc  = UInt(XLEN.W)
-
+  val pc        = UInt(XLEN.W)
+  val reg       = Vec(32, UInt(XLEN.W))
   val privilege = PrivilegedState()
-
 }
-
 object State {
-  def apply()(implicit XLEN: Int, config: RVConfig): State = new State
-  def wireInit()(implicit XLEN: Int, config: RVConfig): State = {
+  def apply()(implicit config: RVConfig): State = new State
+  def wireInit()(implicit config: RVConfig): State = {
+    implicit val XLEN = config.XLEN
+
     val state = Wire(new State)
 
+    state.pc := config.initValue.getOrElse("pc", "h8000_0000").U(XLEN.W)
     state.reg := {
       if (config.formal.arbitraryRegFile) ArbitraryRegFile.gen
       else Seq.fill(32)(0.U(XLEN.W))
     }
-    state.pc := config.initValue.getOrElse("pc", "h8000_0000").U(XLEN.W)
-
     state.privilege := PrivilegedState.wireInit()
 
     state
@@ -139,25 +121,23 @@ class RiscvTrans(singleInstMode: Option[Inst] = None)(implicit config: RVConfig)
     val inst     = Input(UInt(32.W))
     val valid    = Input(Bool())
     val iFetchpc = Output(UInt(XLEN.W))
-    val mem      = new MemIO
-    val tlb      = if (config.functions.tlb) Some(new TLBIO) else None
+    val mem      = MemIO()
+    val tlb      = if (config.functions.tlb) Some(TLBIO()) else None
     // Processor status
     val now  = Input(State())
     val next = Output(State())
-    // Exposed signals
-    val event  = Output(new EventSig)
-    val specWb = Output(new SpecWbIO)
+    // Commit info
+    val commit = Output(CommitIO())
   })
 
   // Initial the value
   now := io.now
   // these signals should keep the value in the next clock if there no changes below
-  next              := now
-  inst              := 0.U
-  global_data.setpc := false.B
-  event             := 0.U.asTypeOf(new EventSig)
-  iFetchpc          := now.pc
-  specWb            := 0.U.asTypeOf(new SpecWbIO)
+  next     := now
+  inst     := 0.U
+  setpc    := false.B
+  iFetchpc := now.pc
+  commit   := 0.U.asTypeOf(CommitIO())
 
   // dont read or write mem
   // if there no LOAD/STORE below
@@ -168,7 +148,7 @@ class RiscvTrans(singleInstMode: Option[Inst] = None)(implicit config: RVConfig)
   when(io.valid) {
     // CSR
     // TODO: merge into a function?
-    next.privilege.csr.cycle := now.privilege.csr.cycle + 1.U
+    // next.privilege.csr.mcycle := now.privilege.csr.mcycle + 1.U
     exceptionSupportInit()
 
     if (!config.functions.tlb) {
@@ -202,10 +182,7 @@ class RiscvTrans(singleInstMode: Option[Inst] = None)(implicit config: RVConfig)
       }
     }
 
-    // End excute
-    next.reg(0) := 0.U
-
-    when(!global_data.setpc) {
+    when(!setpc) {
       if (config.extensions.C) {
         // + 4.U for 32 bits width inst
         // + 2.U for 16 bits width inst in C extension
@@ -222,9 +199,8 @@ class RiscvTrans(singleInstMode: Option[Inst] = None)(implicit config: RVConfig)
   io.tlb.map(_ <> tlb.get)
 
   io.next     := next
-  io.event    := event
   io.iFetchpc := iFetchpc
-  io.specWb <> specWb
+  io.commit <> commit
 }
 
 class RiscvCore(singleInstMode: Option[Inst] = None)(implicit config: RVConfig) extends Module {
@@ -235,14 +211,13 @@ class RiscvCore(singleInstMode: Option[Inst] = None)(implicit config: RVConfig) 
     val inst     = Input(UInt(32.W))
     val valid    = Input(Bool())
     val iFetchpc = Output(UInt(XLEN.W))
-    val mem      = new MemIO
-    val tlb      = if (config.functions.tlb) Some(new TLBIO) else None
+    val mem      = MemIO()
+    val tlb      = if (config.functions.tlb) Some(TLBIO()) else None
     // Processor status
-    val sync = Flipped(Valid(State()))
     val now  = Output(State())
     val next = Output(State())
-    // Exposed signals
-    val event = Output(new EventSig)
+    // Sync from checker
+    val sync = Flipped(Valid(State()))
   })
 
   val state = RegInit(State.wireInit())
@@ -258,6 +233,5 @@ class RiscvCore(singleInstMode: Option[Inst] = None)(implicit config: RVConfig) 
 
   io.now      := state
   io.next     := trans.io.next
-  io.event    := trans.io.event
   io.iFetchpc := trans.io.iFetchpc
 }

@@ -10,23 +10,19 @@ import rvspeccore.core._
 class ConnectHelperSpec extends AnyFlatSpec with ChiselScalatestTester {
   behavior of "ConnectHelper"
 
-  class TestCore(checkMem: Boolean, checkTLB: Boolean)(implicit val config: RVConfig) extends RiscvCore {
-    val checker = Module(new CheckerWithResult(checkMem, false))
+  class TestCore(implicit val config: RVConfig) extends RiscvCore {
+    val checker = Module(new CheckerWithState(false, None))
     checker.io.instCommit.valid := RegNext(io.valid, false.B)
+    checker.io.instCommit.excp  := RegNext(trans.io.commit.exception, false.B)
     checker.io.instCommit.inst  := RegNext(io.inst)
     checker.io.instCommit.pc    := RegNext(state.pc)
     checker.io.instCommit.npc   := DontCare
 
-    checker.io.result := DontCare
-
     ConnectHelper.setRegSource(state.reg)
-    val csr = ConnectHelper.makeCSRSource()
-    csr := state.privilege.csr
+    val privilege = ConnectHelper.makePrivilegeSource()
+    privilege := state.privilege
 
-    val event = ConnectHelper.makeEventSource()
-    event := io.event
-
-    if (checkMem) {
+    if (config.formal.checkMem) {
       val memSource = ConnectHelper.makeMemSource()
       memSource.read.valid     := RegNext(io.mem.read.valid)
       memSource.read.addr      := RegNext(io.mem.read.addr)
@@ -36,7 +32,7 @@ class ConnectHelperSpec extends AnyFlatSpec with ChiselScalatestTester {
       memSource.write.addr     := RegNext(io.mem.write.addr)
       memSource.write.data     := RegNext(io.mem.write.data)
       memSource.write.memWidth := RegNext(io.mem.write.memWidth)
-      if (checkTLB) {
+      if (config.functions.tlb) {
         val dtlbmemSource = ConnectHelper.makeTLBSource(true)
         val itlbmemSource = ConnectHelper.makeTLBSource(false)
         // TODO: need implemention
@@ -48,8 +44,8 @@ class ConnectHelperSpec extends AnyFlatSpec with ChiselScalatestTester {
 
   it should "pass RiscvTests without mem check" in {
     val testFile        = RiscvTests("rv64ui", "rv64ui-addi.hex")
-    implicit val config = RVConfig(64)
-    test(new CoreTester(new TestCore(false, false), testFile.getCanonicalPath())) { c =>
+    implicit val config = RVConfig(64, functions = Seq("Privileged"))
+    test(new CoreTester(new TestCore, testFile.getCanonicalPath())) { c =>
       RiscvTests.stepTest(c, RiscvTests.maxStep)
       RiscvTests.checkReturn(c)
     }
@@ -57,8 +53,8 @@ class ConnectHelperSpec extends AnyFlatSpec with ChiselScalatestTester {
 
   it should "pass RiscvTests with mem check" in {
     val testFile        = RiscvTests("rv64ui", "rv64ui-lb.hex")
-    implicit val config = RVConfig(64)
-    test(new CoreTester(new TestCore(true, false), testFile.getCanonicalPath())) { c =>
+    implicit val config = RVConfig(64, functions = Seq("Privileged"), formal = Seq("CheckMem"))
+    test(new CoreTester(new TestCore, testFile.getCanonicalPath())) { c =>
       RiscvTests.stepTest(c, RiscvTests.maxStep)
       RiscvTests.checkReturn(c)
     }

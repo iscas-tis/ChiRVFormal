@@ -3,8 +3,9 @@ package rvspeccore.core.spec.instset.csr
 import chisel3._
 import chisel3.util._
 
-import rvspeccore.core.BaseCore
+import rvspeccore.core._
 import rvspeccore.core.spec._
+import rvspeccore.core.tool._
 import rvspeccore.core.tool.BitTool._
 
 /** Machine cause register (mcause) values after trap
@@ -110,20 +111,18 @@ object SExceptionCode {
   // reserved or designted for platform use >= 16
 }
 
-trait ExceptionSupport extends BaseCore {
-  def ModeU              = 0x0.U // 00 User/Application
-  def ModeS              = 0x1.U // 01 Supervisor
-  def ModeR              = 0x2.U // 10 Reserved
-  def ModeM              = 0x3.U // 11 Machine
+trait ExceptionSupport extends BaseCore with CheckTool {
   val raiseExceptionIntr = WireInit(false.B)
   val illegalInstruction = WireInit(false.B)
   // 看看产生的是中断还是异常
   // 仲裁之后的统一执行 尾部折叠判断优先级
   val exceptionVec = WireInit(VecInit(Seq.fill(16)(false.B)))
   val exceptionNO  = MuxCase(0.U(log2Ceil(XLEN).W), Priority.excPriority.map(i => exceptionVec(i) -> i.U(5.W)))
+
   def exceptionSupportInit() = {
     illegalInstruction := true.B
   }
+
   def legalInstruction(): Unit = {
     illegalInstruction := false.B
   }
@@ -134,60 +133,57 @@ trait ExceptionSupport extends BaseCore {
       raiseException(MExceptionCode.illegalInstruction)
     }
     when(raiseExceptionIntr) {
-      event.valid := true.B
+      commit.exception := true.B
       dealExceptionCode()
     }.otherwise {
-      event.valid := false.B
+      commit.exception := false.B
     }
   }
+
   def raiseException(exceptionCode: Int): Unit = {
     exceptionVec(exceptionCode) := true.B
     raiseExceptionIntr          := true.B
   }
+
   def dealExceptionCode(): Unit = {
 
-    // event.intrNO := exceptionNO
-    event.cause         := exceptionNO
-    event.exceptionPC   := now.pc
-    event.exceptionInst := inst(31, 0)
     // FIXME: 目前仅仅考虑了异常
     val deleg  = now.privilege.csr.medeleg
-    val delegS = (deleg(exceptionNO)) && (now.privilege.internal.privilegeMode < ModeM)
+    val delegS = (deleg(exceptionNO)) && (now.privilege.mode < PrivilegeLevel.Machine.asUInt)
     // TODO: def raise an Interrupt
     // FIXME: 需要对中断做出处理 但是当前只针对异常进行处理
     val mstatusOld = WireInit(now.privilege.csr.mstatus.asTypeOf(new MstatusStruct))
     val mstatusNew = WireInit(now.privilege.csr.mstatus.asTypeOf(new MstatusStruct))
     when(delegS) {
-      event.cause                           := next.privilege.csr.scause
-      mstatusNew.spp                        := now.privilege.internal.privilegeMode
-      mstatusNew.spie                       := mstatusOld.sie
-      mstatusNew.sie                        := false.B
-      next.privilege.internal.privilegeMode := ModeS
+      mstatusNew.spp      := now.privilege.mode
+      mstatusNew.spie     := mstatusOld.sie
+      mstatusNew.sie      := false.B
+      next.privilege.mode := PrivilegeLevel.Supervisor.asUInt
       switch(now.privilege.csr.MXLEN) {
         is(32.U(8.W)) { doRaiseExceptionS(exceptionNO, 32) }
         is(64.U(8.W)) { if (XLEN >= 64) { doRaiseExceptionS(exceptionNO, 64) } }
       }
     }.otherwise {
-      event.cause                           := next.privilege.csr.mcause
-      mstatusNew.mpp                        := now.privilege.internal.privilegeMode
-      mstatusNew.mpie                       := mstatusOld.mie
-      mstatusNew.mie                        := false.B
-      next.privilege.internal.privilegeMode := ModeM
+      mstatusNew.mpp      := now.privilege.mode
+      mstatusNew.mpie     := mstatusOld.mie
+      mstatusNew.mie      := false.B
+      next.privilege.mode := PrivilegeLevel.Machine.asUInt
       switch(now.privilege.csr.MXLEN) {
         is(32.U(8.W)) { doRaiseExceptionM(exceptionNO, 32) }
         is(64.U(8.W)) { if (XLEN >= 64) { doRaiseExceptionM(exceptionNO, 64) } }
       }
     }
     next.privilege.csr.mstatus := mstatusNew.asUInt
+
     def doRaiseExceptionM(exceptionCode: UInt, MXLEN: Int): Unit = {
       // printf("[Debug]Mtval:%x\n", next.privilege.csr.mtval)
       // common part
-      next.privilege.csr.mcause             := Cat(0.U, zeroExt(exceptionCode, MXLEN - 1))
-      next.privilege.csr.mepc               := now.pc
-      mstatusNew.mpp                        := now.privilege.internal.privilegeMode
-      mstatusNew.mpie                       := mstatusOld.mie
-      mstatusNew.mie                        := false.B
-      next.privilege.internal.privilegeMode := ModeM // 之前写的大bug
+      next.privilege.csr.mcause := Cat(0.U, zeroExt(exceptionCode, MXLEN - 1))
+      next.privilege.csr.mepc   := now.pc
+      mstatusNew.mpp            := now.privilege.mode
+      mstatusNew.mpie           := mstatusOld.mie
+      mstatusNew.mie            := false.B
+      next.privilege.mode       := PrivilegeLevel.Machine.asUInt // 之前写的大bug
       // FIXME: tva此处写法欠妥
       next.privilege.csr.mtval   := 0.U // : For other traps, mtval is set to zero
       next.privilege.csr.mstatus := mstatusNew.asUInt
@@ -231,33 +227,33 @@ trait ExceptionSupport extends BaseCore {
       }
       // printf("Mtvec mode:%x addr:%x\n",now.privilege.csr.mtvec(1,0), now.privilege.csr.mtvec(MXLEN - 1, 2) << 2)
       // jump
-      switch(now.privilege.csr.mtvec(1, 0)) {
-        is(0.U(2.W)) {
-          // setPc := true.B
-          global_data.setpc := true.B
-          next.pc           := (now.privilege.csr.mtvec(MXLEN - 1, 2)) << 2
-          // printf("NextPC:%x\n", next.pc)
-        }
-        is(1.U(2.W)) {
-          global_data.setpc := true.B
-          next.pc           := now.privilege.csr.mtvec(MXLEN - 1, 2) + zeroExt(exceptionCode, MXLEN) << 2
-          // printf("NextPC:%x\n", next.pc)
-        }
-        // >= 2 reserved
-      }
+      // switch(now.privilege.csr.mtvec(1, 0)) {
+      //   is(0.U(2.W)) {
+      //     setPC((now.privilege.csr.mtvec(MXLEN - 1, 2)) << 2)
+      //     // printf("NextPC:%x\n", next.pc)
+      //   }
+      //   is(1.U(2.W)) {
+      //     setPC(now.privilege.csr.mtvec(MXLEN - 1, 2) + zeroExt(exceptionCode, MXLEN) << 2)
+      //     // printf("NextPC:%x\n", next.pc)
+      //   }
+      //   // >= 2 reserved
+      // }
+
+      // all synchronous exceptions into machine mode cause the pc to be set to the address in the BASE field
+      setPC(now.privilege.csr.mtvec(MXLEN - 1, 2) ## 0.U(2.W))
     }
 
     def doRaiseExceptionS(exceptionCode: UInt, MXLEN: Int): Unit = {
       // common part
       next.privilege.csr.scause := Cat(false.B, zeroExt(exceptionCode, MXLEN - 1))
       // printf("[Debug]:scause %x, normal %x \n", next.privilege.csr.scause, Cat(false.B, zeroExt(exceptionCode, MXLEN - 1)))
-      next.privilege.csr.sepc               := now.pc
-      mstatusNew.spp                        := now.privilege.internal.privilegeMode
-      mstatusNew.spie                       := mstatusOld.sie
-      mstatusNew.sie                        := false.B
-      next.privilege.internal.privilegeMode := ModeS
-      next.privilege.csr.stval              := 0.U // : For other traps, mtval is set to zero
-      next.privilege.csr.mstatus            := mstatusNew.asUInt
+      next.privilege.csr.sepc    := now.pc
+      mstatusNew.spp             := now.privilege.mode
+      mstatusNew.spie            := mstatusOld.sie
+      mstatusNew.sie             := false.B
+      next.privilege.mode        := PrivilegeLevel.Supervisor.asUInt
+      next.privilege.csr.stval   := 0.U // : For other traps, mtval is set to zero
+      next.privilege.csr.mstatus := mstatusNew.asUInt
       // TODO: modify the exception case
       // special part
       switch(exceptionCode) {
@@ -305,20 +301,21 @@ trait ExceptionSupport extends BaseCore {
       // printf("Stvec mode:%x addr:%x\n",now.privilege.csr.stvec(1,0), now.privilege.csr.stvec(MXLEN - 1, 2) << 2)
       // jump
       // 还需要使用不同的东西进行跳转
-      switch(now.privilege.csr.stvec(1, 0)) {
-        is(0.U(2.W)) {
-          // setPc := true.B
-          global_data.setpc := true.B
-          next.pc           := (now.privilege.csr.stvec(MXLEN - 1, 2)) << 2
-          // printf("NextPC:%x\n", next.pc)
-        }
-        is(1.U(2.W)) {
-          global_data.setpc := true.B
-          next.pc           := now.privilege.csr.stvec(MXLEN - 1, 2) + zeroExt(exceptionCode, MXLEN) << 2
-          // printf("NextPC:%x\n", next.pc)
-        }
-        // >= 2 reserved
-      }
+      // switch(now.privilege.csr.stvec(1, 0)) {
+      //   is(0.U(2.W)) {
+      //     // setPc := true.B
+      //     setPC((now.privilege.csr.stvec(MXLEN - 1, 2)) << 2)
+      //     // printf("NextPC:%x\n", next.pc)
+      //   }
+      //   is(1.U(2.W)) {
+      //     setPC(now.privilege.csr.stvec(MXLEN - 1, 2) + zeroExt(exceptionCode, MXLEN) << 2)
+      //     // printf("NextPC:%x\n", next.pc)
+      //   }
+      //   // >= 2 reserved
+      // }
+
+      // all synchronous exceptions into machine mode cause the pc to be set to the address in the BASE field
+      setPC(now.privilege.csr.stvec(MXLEN - 1, 2) ## 0.U(2.W))
     }
 
   }

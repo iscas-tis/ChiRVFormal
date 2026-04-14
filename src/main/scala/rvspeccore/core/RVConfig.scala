@@ -25,7 +25,7 @@ case class RVConfig(configs: (String, Any)*) {
     "fakeExtensions" -> "ABCDEFGHIJKLMNOPQRSTUVWXYZ".map(_.toString).toSet,
     "initValue"      -> Set("pc", "mstatus", "mtvec"),
     "functions"      -> Set("Privileged", "TLB"),
-    "formal"         -> Set("ArbitraryRegFile", "CheckCSRs")
+    "formal"         -> Set("ArbitraryRegFile", "CheckMem", "CheckNPC", "CheckCSRs")
   )
   private val cfgs = configs.toMap
 
@@ -111,7 +111,7 @@ case class RVConfig(configs: (String, Any)*) {
 
   // Other Functions Config
   object functions {
-    protected val raw = cfgs.getOrElse("functions", Seq[String]()).asInstanceOf[Seq[String]]
+    val raw = cfgs.getOrElse("functions", Seq[String]()).asInstanceOf[Seq[String]]
     require(
       raw.toSet.subsetOf(acceptKeys("functions")),
       s"Unknown functions in RVConfig: ${(raw.toSet -- acceptKeys("functions")).mkString(",")}"
@@ -123,13 +123,15 @@ case class RVConfig(configs: (String, Any)*) {
 
   // Formal
   object formal {
-    protected val raw = cfgs.getOrElse("formal", Seq[String]()).asInstanceOf[Seq[String]]
+    val raw = cfgs.getOrElse("formal", Seq[String]()).asInstanceOf[Seq[String]]
     require(
       raw.toSet.subsetOf(acceptKeys("formal")),
       s"Unknown formal in RVConfig: ${(raw.toSet -- acceptKeys("formal")).mkString(",")}"
     )
 
     val arbitraryRegFile: Boolean = raw.contains("ArbitraryRegFile")
+    val checkMem: Boolean         = raw.contains("CheckMem")
+    val checkNPC: Boolean         = raw.contains("CheckNPC")
     val checkCSRs: Boolean        = raw.contains("CheckCSRs")
   }
 

@@ -17,24 +17,26 @@ import csr._
   */
 trait PrivilegedInsts {
   // - Trap-Return Instructions
-  val SRET = Inst("b0001000_00010_00000_000_00000_1110011")
-  val MRET = Inst("b0011000_00010_00000_000_00000_1110011")
+  val SRET = Inst("SRET", "b0001000_00010_00000_000_00000_1110011")
+  val MRET = Inst("MRET", "b0011000_00010_00000_000_00000_1110011")
   // - Interrupt-Management Instructions
-  val WFI = Inst("b0001000_00101_00000_000_00000_1110011")
+  val WFI = Inst("WFI", "b0001000_00101_00000_000_00000_1110011")
   // - Supervisor Memory-Management Instructions
-  val SFANCE_VMA      = Inst("b0001001_?????_?????_000_00000_1110011")
-  val SINVAL_VMA      = Inst("b0001011_?????_?????_000_00000_1110011") // not support yet
-  val SFANCE_W_INVAL  = Inst("b0001100_00000_00000_000_00000_1110011") // not support yet
-  val SFANCE_INVAL_IR = Inst("b0001100_00001_00000_000_00000_1110011") // not support yet
+  val SFANCE_VMA      = Inst("SFANCE.VMA", "b0001001_?????_?????_000_00000_1110011")
+  val SINVAL_VMA      = Inst("SINVAL.VMA", "b0001011_?????_?????_000_00000_1110011")      // not support yet
+  val SFANCE_W_INVAL  = Inst("SFANCE.W.INVAL", "b0001100_00000_00000_000_00000_1110011")  // not support yet
+  val SFANCE_INVAL_IR = Inst("SFANCE.INVAL.IR", "b0001100_00001_00000_000_00000_1110011") // not support yet
   // - Hypervisor Memory-Management Instructions
-  val HFANCE_VVMA = Inst("b0010001_?????_?????_000_00000_1110011") // not support yet
-  val HFANCE_GVMA = Inst("b0110001_?????_?????_000_00000_1110011") // not support yet
-  val HINVAL_VVMA = Inst("b0010011_?????_?????_000_00000_1110011") // not support yet
-  val HINVAL_GVMA = Inst("b0110011_?????_?????_000_00000_1110011") // not support yet
+  val HFANCE_VVMA = Inst("HFANCE.VVMA", "b0010001_?????_?????_000_00000_1110011") // not support yet
+  val HFANCE_GVMA = Inst("HFANCE.GVMA", "b0110001_?????_?????_000_00000_1110011") // not support yet
+  val HINVAL_VVMA = Inst("HINVAL.VVMA", "b0010011_?????_?????_000_00000_1110011") // not support yet
+  val HINVAL_GVMA = Inst("HINVAL.GVMA", "b0110011_?????_?????_000_00000_1110011") // not support yet
   // - Hypervisor Virtual-Machine Load and Store Instructions
   // ...
   // - Hypervisor Virtual-Machine Load and Store Instructions, RV64 only
   // ...
+
+  val rvprivilegedInsts = Seq(SRET, MRET, WFI, SFANCE_VMA)
 }
 
 /** “Privileged” Instruction-Fetch Fence Volume II Insts

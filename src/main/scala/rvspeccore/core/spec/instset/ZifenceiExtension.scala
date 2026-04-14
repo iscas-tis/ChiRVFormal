@@ -15,7 +15,9 @@ import rvspeccore.core.tool.BitTool._
   */
 trait ZifenceiExtensionInsts {
   // - RV32/RV64 Zifencei Standard Extension
-  val FENCE_I = Inst("b????????????_?????_001_?????_0001111")
+  val FENCE_I = Inst("FENCE.I", "b????????????_?????_001_?????_0001111")
+
+  val rvzifenceiInsts = Seq(FENCE_I)
 }
 
 /** “Zifencei” Instruction-Fetch Fence
@@ -33,7 +35,6 @@ trait ZifenceiExtension extends BaseCore with CommonDecode with ZifenceiExtensio
   }
 
   def doRVZifencei: Unit = {
-    val rvzifenceiInsts = Seq(FENCE_I)
     rvzifenceiInsts.map { rvzifenceiInst => when(rvzifenceiInst(inst)) { doZifenceiExecute(rvzifenceiInst) } }
   }
 

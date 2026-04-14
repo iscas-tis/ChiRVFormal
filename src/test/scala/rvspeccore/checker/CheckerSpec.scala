@@ -6,30 +6,22 @@ import org.scalatest._
 import org.scalatest.flatspec.AnyFlatSpec
 
 import rvspeccore.core._
-import rvspeccore.core.spec.instset.csr.CSRInfoSignal
+import rvspeccore.core.spec._
+import rvspeccore.core.spec.instset._
+import rvspeccore.core.spec.instset.csr._
 
-class CheckerWithResultSpec extends AnyFlatSpec with ChiselScalatestTester {
-  behavior of "CheckerWithResult"
+class CheckerWithStateSpec extends AnyFlatSpec with ChiselScalatestTester {
+  behavior of "CheckerWithState"
 
-  implicit val config = RVConfig(
-    XLEN = 64,
-    extensions = "MCZifenceiZicsrZbaZbbZbcZbsZbkbZbkcZbkx",
-    functions = Seq("Privileged")
-  )
-
-  class TestCore(checkMem: Boolean = true, enableReg: Boolean = false) extends RiscvCore(None) {
-    val checker = Module(new CheckerWithResult(checkMem = checkMem, enableReg = enableReg))
-    checker.io.instCommit.valid    := RegNext(io.valid, false.B)
-    checker.io.instCommit.inst     := RegNext(io.inst)
-    checker.io.instCommit.pc       := RegNext(state.pc)
-    checker.io.instCommit.npc      := DontCare
-    checker.io.event.valid         := RegNext(io.event.valid, false.B)
-    checker.io.event.intrNO        := RegNext(io.event.intrNO)
-    checker.io.event.cause         := RegNext(io.event.cause)
-    checker.io.event.exceptionPC   := RegNext(io.event.exceptionPC)
-    checker.io.event.exceptionInst := RegNext(io.event.exceptionInst)
+  class TestCore(enableReg: Boolean = false)(implicit val config: RVConfig) extends RiscvCore {
+    val checker = Module(new CheckerWithState(enableReg, None))
+    checker.io.instCommit.valid := RegNext(io.valid, false.B)
+    checker.io.instCommit.excp  := RegNext(trans.io.commit.exception, false.B)
+    checker.io.instCommit.inst  := RegNext(io.inst)
+    checker.io.instCommit.pc    := RegNext(state.pc)
+    checker.io.instCommit.npc   := DontCare
     // printf("[  DUT   ] Valid:%x PC: %x Inst: %x\n", checker.io.instCommit.valid, checker.io.instCommit.pc, checker.io.instCommit.inst)
-    checker.io.result := state
+    checker.io.state := state
 
     checker.io.itlbmem.map(cm => {
       cm := DontCare
@@ -52,128 +44,138 @@ class CheckerWithResultSpec extends AnyFlatSpec with ChiselScalatestTester {
     })
   }
 
-  behavior of "CheckerWithResult"
-
-  it should "pass RiscvTests[mem check: off, reg delay: off]" in {
-    val tests = Seq(
-      RiscvTests("rv64ui", "rv64ui-addi.hex")
-    )
-    tests.foreach { testFile =>
-      test(new CoreTester(new TestCore(false, false), testFile.getCanonicalPath())) { c =>
+  var tests = Seq(
+    RiscvTests("rv64ui", "rv64ui-addi.hex")
+  )
+  tests.foreach { testFile =>
+    it should s"pass RiscvTests[mem check: off, reg delay: off] @${testFile.getName}" in {
+      implicit val config = RVConfig(
+        XLEN = 64,
+        functions = Seq("Privileged")
+      )
+      test(new CoreTester(new TestCore(false), testFile.getCanonicalPath())) { c =>
         RiscvTests.stepTest(c, RiscvTests.maxStep)
         RiscvTests.checkReturn(c)
       }
     }
   }
 
-  val tests =
-    Seq("rv64ui", "rv64um", "rv64uc", "rv64uzba", "rv64uzbb", "rv64uzbc", "rv64uzbs", "rv64uzbkb", "rv64uzbkx")
-
-  tests.foreach { testCase =>
-    RiscvTests(testCase).foreach(f =>
-      it should s"pass RiscvTests[mem check: on, reg delay: off] @${f.getName}" in {
-        test(new CoreTester(new TestCore(true, false), f.getCanonicalPath())) { c =>
-          RiscvTests.stepTest(c, RiscvTests.maxStep)
-          RiscvTests.checkReturn(c)
-        }
-      }
-    )
-  }
-
-  tests.foreach { testCase =>
-    RiscvTests(testCase).foreach(f =>
-      it should s"pass RiscvTests[mem check: on, reg delay: on] @${f.getName}" in {
-        test(new CoreTester(new TestCore(true, true), f.getCanonicalPath())) { c =>
-          RiscvTests.stepTest(c, RiscvTests.maxStep)
-          RiscvTests.checkReturn(c)
-        }
-      }
-    )
-  }
-}
-// We have to extract some signals from RiscvCore, but it certainly modify the structure of the RiscvCore
-// This can't be solved until we discuss with YiCheng about it.
-class CheckerWithWBSpec extends AnyFlatSpec with ChiselScalatestTester {
-  behavior of "CheckerWithWB"
-
-  implicit val config = RVConfig(
-    XLEN = 64,
-    extensions = "MCZifenceiZicsrZbaZbbZbcZbsZbkbZbkcZbkx",
-    functions = Seq("Privileged")
+  tests = Seq(
+    RiscvTests("rv64ui", "rv64ui-addi.hex"),
+    RiscvTests("rv64ui", "rv64ui-lb.hex")
   )
-
-  class TestCore(checkMem: Boolean = true, enableReg: Boolean = false) extends RiscvCore {
-    val wb = Wire(new WriteBack)
-
-    wb := 0.U.asTypeOf(new WriteBack)
-
-    wb.valid   := trans.io.specWb.rd_en
-    wb.dest    := trans.io.specWb.rd_addr
-    wb.data    := trans.io.specWb.rd_data
-    wb.csrAddr := trans.io.specWb.csr_addr
-    wb.r1Addr  := trans.io.specWb.rs1_addr
-    wb.r2Addr  := trans.io.specWb.rs2_addr
-    wb.r1Data  := state.reg(wb.r1Addr)
-    wb.r2Data  := state.reg(wb.r2Addr)
-
-    trans.io.next.privilege.csr.table.foreach { case (CSRInfoSignal(info, nextCSR)) =>
-      when(wb.csrAddr === info.addr) {
-        wb.csrNdata := nextCSR
+  tests.foreach { testFile =>
+    it should s"pass RiscvTests[mem check: on, reg delay: off] @${testFile.getName}" in {
+      implicit val config = RVConfig(
+        XLEN = 64,
+        functions = Seq("Privileged"),
+        formal = Seq("CheckMem")
+      )
+      test(new CoreTester(new TestCore(false), testFile.getCanonicalPath())) { c =>
+        RiscvTests.stepTest(c, RiscvTests.maxStep)
+        RiscvTests.checkReturn(c)
       }
     }
-    wb.csrWr := trans.io.specWb.csr_wr
 
-    val checker = Module(new CheckerWithWB(checkMem, enableReg))
+  }
+
+  tests.foreach { testFile =>
+    it should s"pass RiscvTests[mem check: on, reg delay: on] @${testFile.getName}" in {
+      implicit val config = RVConfig(
+        XLEN = 64,
+        functions = Seq("Privileged"),
+        formal = Seq("CheckMem")
+      )
+      test(new CoreTester(new TestCore(true), testFile.getCanonicalPath())) { c =>
+        RiscvTests.stepTest(c, RiscvTests.maxStep)
+        RiscvTests.checkReturn(c)
+      }
+    }
+
+  }
+
+}
+
+// We have to extract some signals from RiscvCore, but it certainly modify the structure of the RiscvCore
+// This can't be solved until we discuss with YiCheng about it.
+class CheckerWithActionSpec extends AnyFlatSpec with ChiselScalatestTester {
+  behavior of "CheckerWithAction"
+
+  class TestCore(enableReg: Boolean = false)(implicit val config: RVConfig) extends RiscvCore {
+    val writeback = Wire(WriteBack())
+
+    writeback := 0.U.asTypeOf(WriteBack())
+
+    writeback.rs1Addr  := trans.io.commit.rs1Addr
+    writeback.rs2Addr  := trans.io.commit.rs2Addr
+    writeback.rs1Data  := state.reg(writeback.rs1Addr)
+    writeback.rs2Data  := state.reg(writeback.rs2Addr)
+    writeback.rdAddr   := trans.io.commit.rdAddr
+    writeback.rdData   := trans.io.commit.rdData
+    writeback.csrWr    := trans.io.commit.csrWr
+    writeback.csrAddr  := trans.io.commit.csrAddr
+    writeback.csrNdata := trans.io.commit.csrNdata
+
+    val checker = Module(new CheckerWithAction(enableReg))
     checker.io.instCommit.valid := io.valid
+    checker.io.instCommit.excp  := trans.io.commit.exception
     checker.io.instCommit.inst  := io.inst
     checker.io.instCommit.pc    := state.pc
     checker.io.instCommit.npc   := trans.io.next.pc
 
-    checker.io.wb := wb
+    checker.io.writeback := writeback
 
     checker.io.privilege := state.privilege
 
     checker.io.mem.map(_ := trans.io.mem)
   }
 
-  behavior of "CheckerWithWB"
-
-  it should "pass RiscvTests[mem check: off, reg delay: off]" in {
-    val tests = Seq(
-      RiscvTests("rv64ui", "rv64ui-addi.hex")
-    )
-    tests.foreach { testFile =>
-      test(new CoreTester(new TestCore(false, false), testFile.getCanonicalPath())) { c =>
+  var tests = Seq(
+    RiscvTests("rv64ui", "rv64ui-addi.hex")
+  )
+  tests.foreach { testFile =>
+    it should s"pass RiscvTests[mem check: off, reg delay: off] @${testFile.getName}" in {
+      implicit val config = RVConfig(
+        XLEN = 64,
+        functions = Seq("Privileged")
+      )
+      test(new CoreTester(new TestCore(false), testFile.getCanonicalPath())) { c =>
         RiscvTests.stepTest(c, RiscvTests.maxStep)
         RiscvTests.checkReturn(c)
       }
     }
   }
 
-  val tests =
-    Seq("rv64ui", "rv64um", "rv64uc", "rv64uzba", "rv64uzbb", "rv64uzbc", "rv64uzbs", "rv64uzbkb", "rv64uzbkx")
-
-  tests.foreach { testCase =>
-    RiscvTests(testCase).foreach(f =>
-      it should s"pass RiscvTests[mem check: on, reg delay: off] @${f.getName}" in {
-        test(new CoreTester(new TestCore(true, false), f.getCanonicalPath())).withAnnotations(Seq(WriteVcdAnnotation)) {
-          c =>
-            RiscvTests.stepTest(c, RiscvTests.maxStep)
-            RiscvTests.checkReturn(c)
-        }
+  tests = Seq(
+    RiscvTests("rv64ui", "rv64ui-addi.hex"),
+    RiscvTests("rv64ui", "rv64ui-lb.hex")
+  )
+  tests.foreach { testFile =>
+    it should s"pass RiscvTests[mem check: on, reg delay: off] @${testFile.getName}" in {
+      implicit val config = RVConfig(
+        XLEN = 64,
+        functions = Seq("Privileged"),
+        formal = Seq("CheckMem")
+      )
+      test(new CoreTester(new TestCore(false), testFile.getCanonicalPath())) { c =>
+        RiscvTests.stepTest(c, RiscvTests.maxStep)
+        RiscvTests.checkReturn(c)
       }
-    )
+    }
   }
 
-  tests.foreach { testCase =>
-    RiscvTests(testCase).foreach(f =>
-      it should s"pass RiscvTests[mem check: on, reg delay: on] @${f.getName}" in {
-        test(new CoreTester(new TestCore(true, true), f.getCanonicalPath())) { c =>
-          RiscvTests.stepTest(c, RiscvTests.maxStep)
-          RiscvTests.checkReturn(c)
-        }
+  tests.foreach { testFile =>
+    it should s"pass RiscvTests[mem check: on, reg delay: on] @${testFile.getName}" in {
+      implicit val config = RVConfig(
+        XLEN = 64,
+        functions = Seq("Privileged"),
+        formal = Seq("CheckMem")
+      )
+      test(new CoreTester(new TestCore(true), testFile.getCanonicalPath())) { c =>
+        RiscvTests.stepTest(c, RiscvTests.maxStep)
+        RiscvTests.checkReturn(c)
       }
-    )
+    }
   }
 
 }

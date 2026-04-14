@@ -9,10 +9,6 @@ import rvspeccore.core.RVConfig
 import rvspeccore.core.tool.CheckTool
 
 trait CSRSupport extends BaseCore with ExceptionSupport with CheckTool {
-  // def ModeU     = 0x0.U // 00 User/Application
-  // def ModeS     = 0x1.U // 01 Supervisor
-  // def ModeR     = 0x2.U // 10 Reserved
-  // def ModeM     = 0x3.U // 11 Machine
   val VAddrBits = if (XLEN == 32) 32 else 39
   val retTarget = Wire(UInt(VAddrBits.W))
   retTarget := DontCare
@@ -22,8 +18,8 @@ trait CSRSupport extends BaseCore with ExceptionSupport with CheckTool {
     require(addr.getWidth == 12)
     val has: Bool    = MuxLookup(addr, false.B)(now.privilege.csr.table.map { x => x.info.addr -> true.B })
     val nowCSR: UInt = MuxLookup(addr, 0.U)(now.privilege.csr.table.map { x => x.info.addr -> x.signal })
-    val rmask: UInt  = MuxLookup(addr, 0.U)(now.privilege.csr.table.map { x => x.info.addr -> x.info.rmask(XLEN) })
-//     printf("[Debug]CSR_READ:(Have:%d, nowCSR:%x, Addr: %x %x)\n",has,nowCSR,addr,next.reg(1))
+    val rmask: UInt  = MuxLookup(addr, 0.U)(now.privilege.csr.table.map { x => x.info.addr -> x.info.rmask(config) })
+    // printf("[Debug]CSR_READ:(Have:%d, nowCSR:%x, Addr:%x, rmask:%x)\n",has,nowCSR,addr,rmask)
     val rData = WireInit(0.U(XLEN.W))
 
     def doCSRRead(MXLEN: Int): Unit = {
@@ -48,17 +44,19 @@ trait CSRSupport extends BaseCore with ExceptionSupport with CheckTool {
         }
       }
     }
-//    doCSRRead(64)
     switch(now.privilege.csr.MXLEN) {
       is(32.U(8.W)) { doCSRRead(32) }
       is(64.U(8.W)) { if (XLEN >= 64) { doCSRRead(64) } }
     }
+
+    accessCsr(addr, rData)
     rData
   }
+
   def csrWrite(addr: UInt, data: UInt): Unit = {
-    def UnwritableMask = 0.U(XLEN.W)
     require(addr.getWidth == 12)
-    val has: Bool = MuxLookup(addr, false.B)(now.privilege.csr.table.map { x => x.info.addr -> true.B })
+    def UnwritableMask = 0.U(XLEN.W)
+    val has: Bool      = MuxLookup(addr, false.B)(now.privilege.csr.table.map { x => x.info.addr -> true.B })
     when(has) {
       // require(mask.getWidth == XLEN)
       // common wirte
@@ -66,9 +64,9 @@ trait CSRSupport extends BaseCore with ExceptionSupport with CheckTool {
       csrPairs.foreach { case (CSRInfoSignal(info, nowCSR), CSRInfoSignal(_, nextCSR)) =>
         when(addr === info.addr) {
           // printf("[Debug]Find ADDR, %x %x\n", (info.wfn != null).B, (info.wmask != UnwritableMask).B)
-          if (info.wfn.isDefined && info.wmask(XLEN) != UnwritableMask) {
-            nextCSR := info.wfn.get(XLEN)((nowCSR & ~info.wmask(XLEN)) | (data & info.wmask(XLEN)))
-            updateDestCsr(addr)
+          if (info.wse.isDefined && info.wmask(config) != UnwritableMask) {
+            nextCSR := info.wse.get(config)((nowCSR & ~info.wmask(config)) | (data & info.wmask(config)))
+            accessCsr(addr, nextCSR)
             // printf("[Debug]CSR_Write:(Addr: %x, nowCSR: %x, nextCSR: %x)\n", addr, nowCSR, nextCSR)
           } else {
             // if write, this will has exception
@@ -86,23 +84,22 @@ trait CSRSupport extends BaseCore with ExceptionSupport with CheckTool {
   }
 
   def Mret()(implicit config: RVConfig): Unit = {
-    when(now.privilege.internal.privilegeMode === ModeM) {
+    when(now.privilege.mode === PrivilegeLevel.Machine.asUInt) {
       val mstatusOld = WireInit(now.privilege.csr.mstatus.asTypeOf(new MstatusStruct))
       val mstatusNew = WireInit(now.privilege.csr.mstatus.asTypeOf(new MstatusStruct))
-      mstatusNew.mie                        := mstatusOld.mpie
-      next.privilege.internal.privilegeMode := mstatusOld.mpp
-      mstatusNew.mpie                       := true.B
+      mstatusNew.mie      := mstatusOld.mpie
+      next.privilege.mode := mstatusOld.mpp
+      mstatusNew.mpie     := true.B
       // printf("MRET Mstatus: %x, Mode: %x\n", mstatusOld.asUInt, privilegeMode)
       if (config.csr.MisaExtList.contains('U')) {
-        mstatusNew.mpp := ModeU
+        mstatusNew.mpp := PrivilegeLevel.User.asUInt
       } else {
-        mstatusNew.mpp := ModeM
+        mstatusNew.mpp := PrivilegeLevel.Machine.asUInt
       }
       next.privilege.csr.mstatus := mstatusNew.asUInt
       retTarget                  := next.privilege.csr.mepc(VAddrBits - 1, 0)
       // printf("nextpc1:%x\n",now.privilege.csr.mepc)
-      global_data.setpc := true.B
-      next.pc           := now.privilege.csr.mepc
+      setPC(now.privilege.csr.mepc)
       // printf("nextpc2:%x\n",next.pc)
     }.otherwise {
       raiseException(MExceptionCode.illegalInstruction)
@@ -116,22 +113,21 @@ trait CSRSupport extends BaseCore with ExceptionSupport with CheckTool {
     // return instruction, SRET. When TSR=1, attempts to execute SRET while executing in S-mode
     // will raise an illegal instruction exception. When TSR=0, this operation is permitted in S-mode.
     // TSR is read-only 0 when S-mode is not supported.
-    val illegalSret      = now.privilege.internal.privilegeMode < ModeS
-    val illegalSModeSret = now.privilege.internal.privilegeMode === ModeS && mstatusOld.tsr.asBool
+    val illegalSret      = now.privilege.mode < PrivilegeLevel.Supervisor.asUInt
+    val illegalSModeSret = now.privilege.mode === PrivilegeLevel.Supervisor.asUInt && mstatusOld.tsr.asBool
     when(illegalSret || illegalSModeSret) {
       raiseException(MExceptionCode.illegalInstruction)
     }.otherwise {
       // FIXME: is mstatus not sstatus ?
-      mstatusNew.sie                        := mstatusOld.spie
-      next.privilege.internal.privilegeMode := Cat(0.U(1.W), mstatusOld.spp)
-      mstatusNew.spie                       := true.B
-      mstatusNew.spp                        := ModeU
-      mstatusNew.mprv                       := 0x0.U // Volume II P21 " If xPP != M, xRET also sets MPRV = 0 "
-      next.privilege.csr.mstatus            := mstatusNew.asUInt
-      retTarget                             := next.privilege.csr.sepc(VAddrBits - 1, 0)
+      mstatusNew.sie             := mstatusOld.spie
+      next.privilege.mode        := Cat(0.U(1.W), mstatusOld.spp)
+      mstatusNew.spie            := true.B
+      mstatusNew.spp             := PrivilegeLevel.User.asUInt
+      mstatusNew.mprv            := 0x0.U // Volume II P21 " If xPP != M, xRET also sets MPRV = 0 "
+      next.privilege.csr.mstatus := mstatusNew.asUInt
+      retTarget                  := next.privilege.csr.sepc(VAddrBits - 1, 0)
       // printf("nextpc1:%x\n",now.privilege.csr.sepc)
-      global_data.setpc := true.B
-      next.pc           := now.privilege.csr.sepc
+      setPC(next.privilege.csr.sepc)
       // printf("nextpc2:%x\n",next.pc)
       // printf("next mstatus:%x\n", next.privilege.csr.mstatus)
     }

@@ -14,78 +14,104 @@ import rvspeccore.core.tool.CheckTool
   *   - 28.5. Instructions (in alphabetical order)
   */
 trait BExtensionInsts {
-  val add_uw = Inst("b0000100_?????_?????_000_?????_0111011")
-  val andn   = Inst("b0100000_?????_?????_111_?????_0110011")
-  val bclr   = Inst("b0100100_?????_?????_001_?????_0110011")
-  val bclri = Inst(
+  val ADD_UW = Inst("ADD.UW", "b0000100_?????_?????_000_?????_0111011")
+  val ANDN   = Inst("ANDN", "b0100000_?????_?????_111_?????_0110011")
+  val BCLR   = Inst("BCLR", "b0100100_?????_?????_001_?????_0110011")
+  val BCLRI = Inst(
+    "BCLRI",
     32 -> "b0100100_?????_?????_001_?????_0010011",
     64 -> "b010010_??????_?????_001_?????_0010011"
   )
-  val bext = Inst("b0100100_?????_?????_101_?????_0110011")
-  val bexti = Inst(
+  val BEXT = Inst("BEXT", "b0100100_?????_?????_101_?????_0110011")
+  val BEXTI = Inst(
+    "BEXTI",
     32 -> "b0100100_?????_?????_101_?????_0010011",
     64 -> "b010010_??????_?????_101_?????_0010011"
   )
-  val binv = Inst("b0110100_?????_?????_001_?????_0110011")
-  val binvi = Inst(
+  val BINV = Inst("BINV", "b0110100_?????_?????_001_?????_0110011")
+  val BINVI = Inst(
+    "BINVI",
     32 -> "b0110100_?????_?????_001_?????_0010011",
     64 -> "b011010_??????_?????_001_?????_0010011"
   )
-  val bset = Inst("b0010100_?????_?????_001_?????_0110011")
-  val bseti = Inst(
+  val BSET = Inst("BSET", "b0010100_?????_?????_001_?????_0110011")
+  val BSETI = Inst(
+    "BSETI",
     32 -> "b0010100_?????_?????_001_?????_0010011",
     64 -> "b001010_??????_?????_001_?????_0010011"
   )
-  val clmul  = Inst("b0000101_?????_?????_001_?????_0110011")
-  val clmulh = Inst("b0000101_?????_?????_011_?????_0110011")
-  val clmulr = Inst("b0000101_?????_?????_010_?????_0110011")
-  val clz    = Inst("b0110000_00000_?????_001_?????_0010011")
-  val clzw   = Inst("b0110000_00000_?????_001_?????_0011011")
-  val cpop   = Inst("b0110000_00010_?????_001_?????_0010011")
-  val cpopw  = Inst("b0110000_00010_?????_001_?????_0011011")
-  val ctz    = Inst("b0110000_00001_?????_001_?????_0010011")
-  val ctzw   = Inst("b0110000_00001_?????_001_?????_0011011")
-  val max    = Inst("b0000101_?????_?????_110_?????_0110011")
-  val maxu   = Inst("b0000101_?????_?????_111_?????_0110011")
-  val min    = Inst("b0000101_?????_?????_100_?????_0110011")
-  val minu   = Inst("b0000101_?????_?????_101_?????_0110011")
-  val orc_b  = Inst("b001010000111_?????_101_?????_0010011")
-  val orn    = Inst("b0100000_?????_?????_110_?????_0110011")
-  val pack   = Inst("b0000100_?????_?????_100_?????_0110011")
-  val packh  = Inst("b0000100_?????_?????_111_?????_0110011")
-  val packw  = Inst("b0000100_?????_?????_100_?????_0111011")
-  val rev8 = Inst(
+  val CLMUL  = Inst("CLMUL", "b0000101_?????_?????_001_?????_0110011")
+  val CLMULH = Inst("CLMULH", "b0000101_?????_?????_011_?????_0110011")
+  val CLMULR = Inst("CLMULR", "b0000101_?????_?????_010_?????_0110011")
+  val CLZ    = Inst("CLZ", "b0110000_00000_?????_001_?????_0010011")
+  val CLZW   = Inst("CLZW", "b0110000_00000_?????_001_?????_0011011")
+  val CPOP   = Inst("CPOP", "b0110000_00010_?????_001_?????_0010011")
+  val CPOPW  = Inst("CPOPW", "b0110000_00010_?????_001_?????_0011011")
+  val CTZ    = Inst("CTZ", "b0110000_00001_?????_001_?????_0010011")
+  val CTZW   = Inst("CTZW", "b0110000_00001_?????_001_?????_0011011")
+  val MAX    = Inst("MAX", "b0000101_?????_?????_110_?????_0110011")
+  val MAXU   = Inst("MAXU", "b0000101_?????_?????_111_?????_0110011")
+  val MIN    = Inst("MIN", "b0000101_?????_?????_100_?????_0110011")
+  val MINU   = Inst("MINU", "b0000101_?????_?????_101_?????_0110011")
+  val ORC_B  = Inst("ORC.B", "b001010000111_?????_101_?????_0010011")
+  val ORN    = Inst("ORN", "b0100000_?????_?????_110_?????_0110011")
+  val PACK   = Inst("PACK", "b0000100_?????_?????_100_?????_0110011")
+  val PACKH  = Inst("PACKH", "b0000100_?????_?????_111_?????_0110011")
+  val PACKW  = Inst("PACKW", "b0000100_?????_?????_100_?????_0111011")
+  val REV8 = Inst(
+    "REV8",
     32 -> "b011010011000_?????_101_?????_0010011",
     64 -> "b011010111000_?????_101_?????_0010011"
   )
-  val brev8 = Inst("b011010000111_?????_101_?????_0010011")
-  val rol   = Inst("b0110000_?????_?????_001_?????_0110011")
-  val rolw  = Inst("b0110000_?????_?????_001_?????_0111011")
-  val ror   = Inst("b0110000_?????_?????_101_?????_0110011")
-  val rori = Inst(
+  val BREV8 = Inst("BREV8", "b011010000111_?????_101_?????_0010011")
+  val ROL   = Inst("ROL", "b0110000_?????_?????_001_?????_0110011")
+  val ROLW  = Inst("ROLW", "b0110000_?????_?????_001_?????_0111011")
+  val ROR   = Inst("ROR", "b0110000_?????_?????_101_?????_0110011")
+  val RORI = Inst(
+    "RORI",
     32 -> "b0110000_?????_?????_101_?????_0010011",
     64 -> "b011000_??????_?????_101_?????_0010011"
   )
-  val roriw     = Inst("b0110000_?????_?????_101_?????_0011011")
-  val rorw      = Inst("b0110000_?????_?????_101_?????_0111011")
-  val sext_b    = Inst("b0110000_00100_?????_001_?????_0010011")
-  val sext_h    = Inst("b0110000_00101_?????_001_?????_0010011")
-  val sh1add    = Inst("b0010000_?????_?????_010_?????_0110011")
-  val sh1add_uw = Inst("b0010000_?????_?????_010_?????_0111011")
-  val sh2add    = Inst("b0010000_?????_?????_100_?????_0110011")
-  val sh2add_uw = Inst("b0010000_?????_?????_100_?????_0111011")
-  val sh3add    = Inst("b0010000_?????_?????_110_?????_0110011")
-  val sh3add_uw = Inst("b0010000_?????_?????_110_?????_0111011")
-  val slli_uw   = Inst("b000010_??????_?????_001_?????_0011011")
-  val unzip     = Inst("b0000100_01111_?????_101_?????_0010011")
-  val xnor      = Inst("b0100000_?????_?????_100_?????_0110011")
-  val xperm8    = Inst("b0010100_?????_?????_100_?????_0110011")
-  val xperm4    = Inst("b0010100_?????_?????_010_?????_0110011")
-  val zext_h = Inst(
+  val RORIW     = Inst("RORIW", "b0110000_?????_?????_101_?????_0011011")
+  val RORW      = Inst("RORW", "b0110000_?????_?????_101_?????_0111011")
+  val SEXT_B    = Inst("SEXT.B", "b0110000_00100_?????_001_?????_0010011")
+  val SEXT_H    = Inst("SEXT.H", "b0110000_00101_?????_001_?????_0010011")
+  val SH1ADD    = Inst("SH1ADD", "b0010000_?????_?????_010_?????_0110011")
+  val SH1ADD_UW = Inst("SH1ADD.UW", "b0010000_?????_?????_010_?????_0111011")
+  val SH2ADD    = Inst("SH2ADD", "b0010000_?????_?????_100_?????_0110011")
+  val SH2ADD_UW = Inst("SH2ADD.UW", "b0010000_?????_?????_100_?????_0111011")
+  val SH3ADD    = Inst("SH3ADD", "b0010000_?????_?????_110_?????_0110011")
+  val SH3ADD_UW = Inst("SH3ADD.UW", "b0010000_?????_?????_110_?????_0111011")
+  val SLLI_UW   = Inst("SLLI.UW", "b000010_??????_?????_001_?????_0011011")
+  val UNZIP     = Inst("UNZIP", "b0000100_01111_?????_101_?????_0010011")
+  val XNOR      = Inst("XNOR", "b0100000_?????_?????_100_?????_0110011")
+  val XPERM8    = Inst("XPERM8", "b0010100_?????_?????_100_?????_0110011")
+  val XPERM4    = Inst("XPERM4", "b0010100_?????_?????_010_?????_0110011")
+  val ZEXT_H = Inst(
+    "ZEXT.H",
     32 -> "b0000100_00000_?????_100_?????_0110011",
     64 -> "b0000100_00000_?????_100_?????_0111011"
   )
-  val zip = Inst("b0000100_01111_?????_001_?????_0010011")
+  val ZIP = Inst("ZIP", "b0000100_01111_?????_001_?????_0010011")
+
+  val rv32zbaInsts      = Seq(SH1ADD, SH2ADD, SH3ADD)
+  val rv32zbkb_zbbInsts = Seq(ANDN, ORN, XNOR, ROL, ROR, RORI, REV8)
+  val rv32zbbInsts      = rv32zbkb_zbbInsts ++ Seq(CLZ, CTZ, CPOP, MAX, MAXU, MIN, MINU, SEXT_B, SEXT_H, ZEXT_H, ORC_B)
+  val rv32zbkc_zbcInsts = Seq(CLMUL, CLMULH)
+  val rv32zbcInsts      = rv32zbkc_zbcInsts ++ Seq(CLMULR)
+  val rv32zbsInsts      = Seq(BCLR, BCLRI, BEXT, BEXTI, BINV, BINVI, BSET, BSETI)
+  val rv32zbkbInsts     = rv32zbkb_zbbInsts ++ Seq(PACK, PACKH, BREV8, ZIP, UNZIP)
+  val rv32zbkcInsts     = rv32zbkc_zbcInsts ++ Seq(XPERM8, XPERM4)
+  val rv32zbkxInsts     = Seq(XPERM8, XPERM4)
+
+  val rv64zbaInsts      = rv32zbaInsts ++ Seq(ADD_UW, SH1ADD_UW, SH2ADD_UW, SH3ADD_UW, SLLI_UW)
+  val rv64zbkb_zbbInsts = Seq(ROLW, RORW, RORIW)
+  val rv64zbbInsts      = rv32zbbInsts ++ rv64zbkb_zbbInsts ++ Seq(CLZW, CTZW, CPOPW)
+  val rv64zbcInsts      = rv32zbcInsts
+  val rv64zbsInsts      = rv32zbsInsts
+  val rv64zbkbInsts     = rv32zbkbInsts ++ rv64zbkb_zbbInsts ++ Seq(PACKW)
+  val rv64zbkcInsts     = rv32zbkcInsts
+  val rv64zbkxInsts     = rv32zbkxInsts
 }
 
 /** "B" Extension for Bit Manipulation, Version 1.0.0
@@ -115,64 +141,64 @@ trait BExtension extends BaseCore with CommonDecode with BExtensionInsts with Ch
     singleInst match {
       // doRV32B
       // doRV32Zba
-      case `sh1add` => decodeR; updateDestReg(rd, getSrc2Reg(rs2) + (getSrc1Reg(rs1) << 1))
-      case `sh2add` => decodeR; updateDestReg(rd, getSrc2Reg(rs2) + (getSrc1Reg(rs1) << 2))
-      case `sh3add` => decodeR; updateDestReg(rd, getSrc2Reg(rs2) + (getSrc1Reg(rs1) << 3))
+      case SH1ADD => decodeR; updateDestReg(rd, getSrc2Reg(rs2) + (getSrc1Reg(rs1) << 1))
+      case SH2ADD => decodeR; updateDestReg(rd, getSrc2Reg(rs2) + (getSrc1Reg(rs1) << 2))
+      case SH3ADD => decodeR; updateDestReg(rd, getSrc2Reg(rs2) + (getSrc1Reg(rs1) << 3))
       // doRV32Zbb
-      case `andn` => decodeR; updateDestReg(rd, getSrc1Reg(rs1) & (~getSrc2Reg(rs2)))
-      case `orn`  => decodeR; updateDestReg(rd, getSrc1Reg(rs1) | (~getSrc2Reg(rs2)))
-      case `xnor` => decodeR; updateDestReg(rd, ~(getSrc1Reg(rs1) ^ getSrc2Reg(rs2)))
-      case `clz` =>
+      case ANDN => decodeR; updateDestReg(rd, getSrc1Reg(rs1) & (~getSrc2Reg(rs2)))
+      case ORN  => decodeR; updateDestReg(rd, getSrc1Reg(rs1) | (~getSrc2Reg(rs2)))
+      case XNOR => decodeR; updateDestReg(rd, ~(getSrc1Reg(rs1) ^ getSrc2Reg(rs2)))
+      case CLZ =>
         decodeI;
         updateDestReg(rd, Mux(getSrc1Reg(rs1) === 0.U, XLEN.U, PriorityEncoder(getSrc1Reg(rs1).asBools.reverse)))
-      case `ctz` =>
+      case CTZ =>
         decodeI; updateDestReg(rd, Mux(getSrc1Reg(rs1) === 0.U, XLEN.U, PriorityEncoder(getSrc1Reg(rs1).asBools)))
-      case `cpop` => decodeI; updateDestReg(rd, PopCount(getSrc1Reg(rs1)))
-      case `max` =>
+      case CPOP => decodeI; updateDestReg(rd, PopCount(getSrc1Reg(rs1)))
+      case MAX =>
         decodeR;
         updateDestReg(rd, Mux(getSrc1Reg(rs1).asSInt < getSrc2Reg(rs2).asSInt, getSrc2Reg(rs2), getSrc1Reg(rs1)))
-      case `maxu` =>
+      case MAXU =>
         decodeR;
         updateDestReg(rd, Mux(getSrc1Reg(rs1).asUInt < getSrc2Reg(rs2).asUInt, getSrc2Reg(rs2), getSrc1Reg(rs1)))
-      case `min` =>
+      case MIN =>
         decodeR;
         updateDestReg(rd, Mux(getSrc1Reg(rs1).asSInt < getSrc2Reg(rs2).asSInt, getSrc1Reg(rs1), getSrc2Reg(rs2)))
-      case `minu` =>
+      case MINU =>
         decodeR;
         updateDestReg(rd, Mux(getSrc1Reg(rs1).asUInt < getSrc2Reg(rs2).asUInt, getSrc1Reg(rs1), getSrc2Reg(rs2)))
-      case `sext_b` => decodeI; updateDestReg(rd, signExt(getSrc1Reg(rs1)(7, 0), XLEN))
-      case `sext_h` => decodeI; updateDestReg(rd, signExt(getSrc1Reg(rs1)(15, 0), XLEN))
-      case `zext_h` if config.XLEN == 32 =>
+      case SEXT_B => decodeI; updateDestReg(rd, signExt(getSrc1Reg(rs1)(7, 0), XLEN))
+      case SEXT_H => decodeI; updateDestReg(rd, signExt(getSrc1Reg(rs1)(15, 0), XLEN))
+      case ZEXT_H if config.XLEN == 32 =>
         decodeI; updateDestReg(rd, zeroExt(getSrc1Reg(rs1)(15, 0), XLEN))
-      case `rol` =>
+      case ROL =>
         decodeR;
         updateDestReg(
           rd,
           (getSrc1Reg(rs1) << getRotationShamt(getSrc2Reg(rs2), XLEN)) |
             (getSrc1Reg(rs1) >> (XLEN.U - getRotationShamt(getSrc2Reg(rs2), XLEN)))
         )
-      case `ror` =>
+      case ROR =>
         decodeR;
         updateDestReg(
           rd,
           (getSrc1Reg(rs1) >> getRotationShamt(getSrc2Reg(rs2), XLEN)) |
             (getSrc1Reg(rs1) << (XLEN.U - getRotationShamt(getSrc2Reg(rs2), XLEN)))
         )
-      case `rori` =>
+      case RORI =>
         decodeI;
         updateDestReg(
           rd,
           (getSrc1Reg(rs1) >> getRotationShamt(imm, XLEN)) |
             (getSrc1Reg(rs1) << (XLEN.U - getRotationShamt(imm, XLEN)))
         )
-      case `orc_b` =>
+      case ORC_B =>
         val byteResults = VecInit(Seq.fill(XLEN / 8)(0.U(8.W)))
         for (i <- 0 until XLEN by 8) {
           val byte = getSrc1Reg(rs1)(i + 7, i)
           byteResults(i / 8) := Mux(byte.orR, 0xff.U(8.W), 0x00.U(8.W))
         }
         decodeR; updateDestReg(rd, byteResults.asUInt)
-      case `rev8` if config.XLEN == 32 =>
+      case REV8 if config.XLEN == 32 =>
         var result = 0.U(XLEN.W)
         var j      = XLEN - 8
         for (i <- 0 until XLEN by 8) {
@@ -181,7 +207,7 @@ trait BExtension extends BaseCore with CommonDecode with BExtensionInsts with Ch
         }
         decodeR; updateDestReg(rd, result)
       // doRV32Zbc
-      case `clmul` =>
+      case CLMUL =>
         decodeR;
         val partialResults = VecInit(Seq.fill(XLEN)(0.U(XLEN.W)))
         for (i <- 0 until XLEN) {
@@ -190,7 +216,7 @@ trait BExtension extends BaseCore with CommonDecode with BExtensionInsts with Ch
           }
         }
         updateDestReg(rd, partialResults.reduce(_ ^ _))
-      case `clmulh` =>
+      case CLMULH =>
         decodeR;
         val partialResults = VecInit(Seq.fill(XLEN)(0.U(XLEN.W)))
         for (i <- 1 to XLEN) {
@@ -199,7 +225,7 @@ trait BExtension extends BaseCore with CommonDecode with BExtensionInsts with Ch
           }
         }
         updateDestReg(rd, partialResults.reduce(_ ^ _))
-      case `clmulr` =>
+      case CLMULR =>
         decodeR;
         val partialResults = VecInit(Seq.fill(XLEN)(0.U(XLEN.W)))
         for (i <- 0 until XLEN) {
@@ -209,21 +235,21 @@ trait BExtension extends BaseCore with CommonDecode with BExtensionInsts with Ch
         }
         updateDestReg(rd, partialResults.reduce(_ ^ _))
       // doRV32Zbs
-      case `bclr` =>
+      case BCLR =>
         decodeR; updateDestReg(rd, getSrc1Reg(rs1) & ~((1.U << getRotationShamt(getSrc2Reg(rs2), XLEN)).asUInt))
-      case `bclri` => decodeI; updateDestReg(rd, getSrc1Reg(rs1) & ~((1.U << getRotationShamt(imm, XLEN)).asUInt))
-      case `bext`  => decodeR; updateDestReg(rd, (getSrc1Reg(rs1) >> getRotationShamt(getSrc2Reg(rs2), XLEN)) & 1.U)
-      case `bexti` => decodeI; updateDestReg(rd, (getSrc1Reg(rs1) >> getRotationShamt(imm, XLEN)) & 1.U)
-      case `binv`  => decodeR; updateDestReg(rd, getSrc1Reg(rs1) ^ (1.U << getRotationShamt(getSrc2Reg(rs2), XLEN)))
-      case `binvi` => decodeI; updateDestReg(rd, getSrc1Reg(rs1) ^ (1.U << getRotationShamt(imm, XLEN)))
-      case `bset`  => decodeR; updateDestReg(rd, getSrc1Reg(rs1) | (1.U << getRotationShamt(getSrc2Reg(rs2), XLEN)))
-      case `bseti` => decodeI; updateDestReg(rd, getSrc1Reg(rs1) | (1.U << getRotationShamt(imm, XLEN)))
+      case BCLRI => decodeI; updateDestReg(rd, getSrc1Reg(rs1) & ~((1.U << getRotationShamt(imm, XLEN)).asUInt))
+      case BEXT  => decodeR; updateDestReg(rd, (getSrc1Reg(rs1) >> getRotationShamt(getSrc2Reg(rs2), XLEN)) & 1.U)
+      case BEXTI => decodeI; updateDestReg(rd, (getSrc1Reg(rs1) >> getRotationShamt(imm, XLEN)) & 1.U)
+      case BINV  => decodeR; updateDestReg(rd, getSrc1Reg(rs1) ^ (1.U << getRotationShamt(getSrc2Reg(rs2), XLEN)))
+      case BINVI => decodeI; updateDestReg(rd, getSrc1Reg(rs1) ^ (1.U << getRotationShamt(imm, XLEN)))
+      case BSET  => decodeR; updateDestReg(rd, getSrc1Reg(rs1) | (1.U << getRotationShamt(getSrc2Reg(rs2), XLEN)))
+      case BSETI => decodeI; updateDestReg(rd, getSrc1Reg(rs1) | (1.U << getRotationShamt(imm, XLEN)))
       // doRV32Zbkb
-      case `pack` =>
+      case PACK =>
         decodeR;
         updateDestReg(rd, getSrc2Reg(rs2)(((XLEN >> 1) - 1), 0) << (XLEN / 2) | getSrc1Reg(rs1)(((XLEN >> 1) - 1), 0))
-      case `packh` => decodeR; updateDestReg(rd, zeroExt((getSrc2Reg(rs2)(7, 0) << 8) | getSrc1Reg(rs1)(7, 0), XLEN))
-      case `brev8` =>
+      case PACKH => decodeR; updateDestReg(rd, zeroExt((getSrc2Reg(rs2)(7, 0) << 8) | getSrc1Reg(rs1)(7, 0), XLEN))
+      case BREV8 =>
         decodeR;
         var result = 0.U(XLEN.W)
         for (i <- 0 until XLEN by 8) {
@@ -231,7 +257,7 @@ trait BExtension extends BaseCore with CommonDecode with BExtensionInsts with Ch
           result = (result | (swapped << i)).asUInt
         }
         updateDestReg(rd, result)
-      case `zip` if config.XLEN == 32 =>
+      case ZIP if config.XLEN == 32 =>
         decodeR;
         var result = 0.U(XLEN.W)
         for (i <- 0 until XLEN / 2) {
@@ -240,7 +266,7 @@ trait BExtension extends BaseCore with CommonDecode with BExtensionInsts with Ch
           result = (result | (upper << ((i << 1) + 1)) | (lower << (i << 1))).asUInt
         }
         updateDestReg(rd, result)
-      case `unzip` if config.XLEN == 32 =>
+      case UNZIP if config.XLEN == 32 =>
         decodeR;
         var result = 0.U(XLEN.W)
         for (i <- 0 until XLEN / 2) {
@@ -250,7 +276,7 @@ trait BExtension extends BaseCore with CommonDecode with BExtensionInsts with Ch
         }
         updateDestReg(rd, result)
       // doRV32Zbkx
-      case `xperm8` =>
+      case XPERM8 =>
         decodeR;
         var result = 0.U(XLEN.W)
         for (i <- 0 until XLEN by 8) {
@@ -259,7 +285,7 @@ trait BExtension extends BaseCore with CommonDecode with BExtensionInsts with Ch
           result = (result | (bitValue << i)).asUInt
         }
         updateDestReg(rd, result)
-      case `xperm4` =>
+      case XPERM4 =>
         decodeR;
         var result = 0.U(XLEN.W)
         for (i <- 0 until XLEN by 4) {
@@ -270,42 +296,42 @@ trait BExtension extends BaseCore with CommonDecode with BExtensionInsts with Ch
         updateDestReg(rd, result)
       // doRV64B
       // doRV64Zba
-      case `add_uw` if config.XLEN == 64 =>
+      case ADD_UW if config.XLEN == 64 =>
         decodeR; updateDestReg(rd, getSrc2Reg(rs2) + zeroExt(getSrc1Reg(rs1)(31, 0), XLEN))
-      case `sh1add_uw` if config.XLEN == 64 =>
+      case SH1ADD_UW if config.XLEN == 64 =>
         decodeR; updateDestReg(rd, getSrc2Reg(rs2) + (zeroExt(getSrc1Reg(rs1)(31, 0), XLEN) << 1))
-      case `sh2add_uw` if config.XLEN == 64 =>
+      case SH2ADD_UW if config.XLEN == 64 =>
         decodeR; updateDestReg(rd, getSrc2Reg(rs2) + (zeroExt(getSrc1Reg(rs1)(31, 0), XLEN) << 2))
-      case `sh3add_uw` if config.XLEN == 64 =>
+      case SH3ADD_UW if config.XLEN == 64 =>
         decodeR; updateDestReg(rd, getSrc2Reg(rs2) + (zeroExt(getSrc1Reg(rs1)(31, 0), XLEN) << 3))
-      case `slli_uw` if config.XLEN == 64 =>
+      case SLLI_UW if config.XLEN == 64 =>
         decodeI; updateDestReg(rd, zeroExt(getSrc1Reg(rs1)(31, 0), XLEN) << imm(5, 0))
       // doRV64Zbb
-      case `clzw` if config.XLEN == 64 =>
+      case CLZW if config.XLEN == 64 =>
         decodeI;
         updateDestReg(rd, Mux(getSrc1Reg(rs1) === 0.U, 32.U, PriorityEncoder(getSrc1Reg(rs1)(31, 0).asBools.reverse)))
-      case `ctzw` if config.XLEN == 64 =>
+      case CTZW if config.XLEN == 64 =>
         decodeI; updateDestReg(rd, Mux(getSrc1Reg(rs1) === 0.U, 32.U, PriorityEncoder(getSrc1Reg(rs1)(31, 0).asBools)))
-      case `cpopw` if config.XLEN == 64 =>
+      case CPOPW if config.XLEN == 64 =>
         decodeI; updateDestReg(rd, PopCount(getSrc1Reg(rs1)(31, 0)))
-      case `zext_h` if config.XLEN == 64 =>
+      case ZEXT_H if config.XLEN == 64 =>
         decodeI; updateDestReg(rd, zeroExt(getSrc1Reg(rs1)(15, 0), XLEN))
-      case `rolw` if config.XLEN == 64 =>
+      case ROLW if config.XLEN == 64 =>
         decodeR
         val rs1_data = zeroExt(getSrc1Reg(rs1)(31, 0), XLEN)
         val result = ((rs1_data << getSrc2Reg(rs2)(4, 0)).asUInt | (rs1_data >> (32.U - getSrc2Reg(rs2)(4, 0))).asUInt)
         updateDestReg(rd, signExt(result(31, 0), XLEN))
-      case `roriw` if config.XLEN == 64 =>
+      case RORIW if config.XLEN == 64 =>
         decodeI
         val rs1_data = zeroExt(getSrc1Reg(rs1)(31, 0), XLEN)
         val result   = (rs1_data >> imm(4, 0)).asUInt | (rs1_data << (32.U - imm(4, 0))).asUInt
         updateDestReg(rd, signExt(result(31, 0), XLEN))
-      case `rorw` if config.XLEN == 64 =>
+      case RORW if config.XLEN == 64 =>
         decodeR
         val rs1_data = zeroExt(getSrc1Reg(rs1)(31, 0), XLEN)
         val result   = (rs1_data >> getSrc2Reg(rs2)(4, 0)).asUInt | (rs1_data << (32.U - getSrc2Reg(rs2)(4, 0))).asUInt
         updateDestReg(rd, signExt(result(31, 0), XLEN))
-      case `rev8` if config.XLEN == 64 =>
+      case REV8 if config.XLEN == 64 =>
         decodeR
         var result = 0.U(XLEN.W)
         var j      = XLEN - 8
@@ -315,32 +341,13 @@ trait BExtension extends BaseCore with CommonDecode with BExtensionInsts with Ch
         }
         updateDestReg(rd, result)
       // doRV64Zbkb
-      case `packw` if config.XLEN == 64 =>
+      case PACKW if config.XLEN == 64 =>
         decodeR; updateDestReg(rd, signExt((getSrc2Reg(rs2)(15, 0) << 16) | getSrc1Reg(rs1)(15, 0), XLEN))
       case _ =>
     }
   }
 
   def doRVB(): Unit = {
-    val rv32zbaInsts      = Seq(sh1add, sh2add, sh3add)
-    val rv32zbkb_zbbInsts = Seq(andn, orn, xnor, rol, ror, rori, rev8)
-    val rv32zbbInsts = rv32zbkb_zbbInsts ++ Seq(clz, ctz, cpop, max, maxu, min, minu, sext_b, sext_h, zext_h, orc_b)
-    val rv32zbkc_zbcInsts = Seq(clmul, clmulh)
-    val rv32zbcInsts      = rv32zbkc_zbcInsts ++ Seq(clmulr)
-    val rv32zbsInsts      = Seq(bclr, bclri, bext, bexti, binv, binvi, bset, bseti)
-    val rv32zbkbInsts     = rv32zbkb_zbbInsts ++ Seq(pack, packh, brev8, zip, unzip)
-    val rv32zbkcInsts     = rv32zbkc_zbcInsts ++ Seq(xperm8, xperm4)
-    val rv32zbksInsts     = Seq(xperm8, xperm4)
-
-    val rv64zbaInsts      = rv32zbaInsts ++ Seq(add_uw, sh1add_uw, sh2add_uw, sh3add_uw, slli_uw)
-    val rv64zbkb_zbbInsts = Seq(rolw, rorw, roriw)
-    val rv64zbbInsts      = rv32zbbInsts ++ rv64zbkb_zbbInsts ++ Seq(clzw, ctzw, cpopw)
-    val rv64zbcInsts      = rv32zbcInsts
-    val rv64zbsInsts      = rv32zbsInsts
-    val rv64zbkbInsts     = rv32zbkbInsts ++ rv64zbkb_zbbInsts ++ Seq(packw)
-    val rv64zbkcInsts     = rv32zbkcInsts
-    val rv64zbkxInsts     = rv32zbksInsts
-
     val rv32zbInsts = Seq(
       (config.extensions.Zba, rv32zbaInsts),
       (config.extensions.Zbb, rv32zbbInsts),
@@ -348,7 +355,7 @@ trait BExtension extends BaseCore with CommonDecode with BExtensionInsts with Ch
       (config.extensions.Zbs, rv32zbsInsts),
       (config.extensions.Zbkb, rv32zbkbInsts),
       (config.extensions.Zbkc, rv32zbkcInsts),
-      (config.extensions.Zbkx, rv32zbksInsts)
+      (config.extensions.Zbkx, rv32zbkxInsts)
     ).collect { case (true, insts) => insts.toSeq }.foldLeft(Set.empty[Inst])(_ ++ _)
     val rv64zbInsts = Seq(
       (config.extensions.Zba, rv64zbaInsts),

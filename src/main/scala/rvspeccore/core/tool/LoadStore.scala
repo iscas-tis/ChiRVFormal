@@ -5,12 +5,9 @@ import chisel3.util._
 
 import rvspeccore.core.BaseCore
 import rvspeccore.core.spec.instset.csr._
+import os.write
 
 // TODO: Optimize code writing style
-class TLBSig()(implicit XLEN: Int) extends Bundle {
-  val read  = new TLBMemInfo
-  val write = new TLBMemInfo
-}
 class TLBMemInfo()(implicit XLEN: Int) extends Bundle {
   val valid    = Bool()
   val addr     = UInt(XLEN.W)
@@ -19,21 +16,29 @@ class TLBMemInfo()(implicit XLEN: Int) extends Bundle {
   val access   = Bool()
   val level    = UInt(2.W)
 }
+class TLBSig()(implicit XLEN: Int) extends Bundle {
+  val read  = new TLBMemInfo
+  val write = new TLBMemInfo
+}
+object TLBSig {
+  def apply()(implicit XLEN: Int) = new TLBSig
+}
+
 class PTWLevel()(implicit XLEN: Int) extends Bundle {
   val valid   = Bool()
   val success = Bool()
   val addr    = UInt(XLEN.W)
   val pte     = UInt(XLEN.W) // FIXME: Just for SV39
 }
+object PTWLevel {
+  def apply()(implicit XLEN: Int) = new PTWLevel
+}
 
-trait LoadStore extends BaseCore with MMU {
-//   def ModeU     = 0x0.U // 00 User/Application
-//   def ModeS     = 0x1.U // 01 Supervisor
-//   def ModeR     = 0x2.U // 10 Reserved
-//   def ModeM     = 0x3.U // 11 Machine
+trait LoadStore extends BaseCore with MMU with ExceptionSupport {
   def iFetch = 0x0.U
   def Load   = 0x1.U
   def Store  = 0x2.U
+
   def width2Mask(width: UInt): UInt = {
     MuxLookup(width, 0.U(64.W))(
       Seq(
@@ -44,72 +49,93 @@ trait LoadStore extends BaseCore with MMU {
       )
     )
   }
-  def memRead(addr: UInt, memWidth: UInt): UInt = {
-    if (!config.functions.tlb) {
-      val bytesWidth = log2Ceil(XLEN / 8)
-      val rOff       = addr(bytesWidth - 1, 0) << 3 // addr(byteWidth-1,0) * 8
-      val rMask      = width2Mask(memWidth)
-      mem.read.valid    := true.B
-      mem.read.addr     := addr
-      mem.read.memWidth := memWidth
-      (mem.read.data >> rOff) & rMask
-    } else {
-      val bytesWidth    = log2Ceil(XLEN / 8)
-      val rOff          = addr(bytesWidth - 1, 0) << 3 // addr(byteWidth-1,0) * 8
-      val rMask         = width2Mask(memWidth)
+
+  def addrAligned(addr: UInt, width: UInt): Bool = {
+    MuxLookup(width, false.B)(
+      Seq(
+        8.U  -> true.B,               // b
+        16.U -> (addr(0) === 0.U),    // h
+        32.U -> (addr(1, 0) === 0.U), // w
+        64.U -> (addr(2, 0) === 0.U)  // d
+      )
+    )
+  }
+
+  def memRead(addr: UInt, memWidth: UInt): (UInt, Bool) = {
+    require(addr.getWidth == XLEN, s"${addr.getWidth} != ${XLEN}")
+    val aligned = addrAligned(addr, memWidth)
+    when(!aligned) { raiseException(MExceptionCode.loadAddressMisaligned) }
+    val rAddr = WireInit(addr)
+    val excp  = WireInit(!aligned)
+    if (config.functions.tlb) {
       val mstatusStruct = now.privilege.csr.mstatus.asTypeOf(new MstatusStruct)
-      val pv            = Mux(mstatusStruct.mprv.asBool, mstatusStruct.mpp, now.privilege.internal.privilegeMode)
-      val vmEnable      = now.privilege.csr.satp.asTypeOf(new SatpStruct).mode === 8.U && (pv < 0x3.U)
-      mem.read.valid := true.B
-      when(vmEnable) {
-        // mem.read.addr     := AddrTransRead(addr)
+      val pv            = Mux(mstatusStruct.mprv.asBool, mstatusStruct.mpp, now.privilege.mode)
+      val vmEnable = now.privilege.csr.satp.asTypeOf(new SatpStruct).mode === 8.U &&
+        (pv < PrivilegeLevel.Machine.asUInt)
+      when(aligned && vmEnable) {
         // FIXME: addr 的虚实地址均并非64位 需进一步加以限制
         val (success, finaladdr) = PageTableWalk(addr, Load, pv)
         when(success) {
-          mem.read.addr := finaladdr
+          rAddr := finaladdr
         }.otherwise {
+          excp := true.B
           raiseException(MExceptionCode.loadPageFault)
         }
-      }.otherwise {
-        mem.read.addr := addr
       }
-      mem.read.memWidth := memWidth
-      (mem.read.data >> rOff) & rMask
     }
+
+    val bytesWidth = log2Ceil(XLEN / 8)
+    val rOff       = addr(bytesWidth - 1, 0) << 3 // addr(byteWidth-1,0) * 8
+    val rMask      = width2Mask(memWidth)
+    val rData      = (mem.read.data >> rOff) & rMask
+
+    mem.read.valid    := !excp
+    mem.read.addr     := rAddr
+    mem.read.memWidth := memWidth
+
+    (rData, excp)
   }
 
-  def memWrite(addr: UInt, memWidth: UInt, data: UInt): Unit = {
-    if (!config.functions.tlb) {
-      mem.write.valid    := true.B
-      mem.write.addr     := addr
-      mem.write.memWidth := memWidth
-      mem.write.data     := data
-    } else {
-      // val pv = Mux(now.privilege.csr.mstatus)
+  def memWrite(addr: UInt, memWidth: UInt, data: UInt): Bool = {
+    require(addr.getWidth == XLEN, s"${addr.getWidth} != ${XLEN}")
+    val aligned = addrAligned(addr, memWidth)
+    when(!aligned) { raiseException(MExceptionCode.storeOrAMOAddressMisaligned) }
+    val wAddr = WireInit(addr)
+    val excp  = WireInit(!aligned)
+    if (config.functions.tlb) {
       val mstatusStruct = now.privilege.csr.mstatus.asTypeOf(new MstatusStruct)
-      val pv            = Mux(mstatusStruct.mprv.asBool, mstatusStruct.mpp, now.privilege.internal.privilegeMode)
-      val vmEnable      = now.privilege.csr.satp.asTypeOf(new SatpStruct).mode === 8.U && (pv < 0x3.U)
+      val pv            = Mux(mstatusStruct.mprv.asBool, mstatusStruct.mpp, now.privilege.mode)
+      val vmEnable = now.privilege.csr.satp.asTypeOf(new SatpStruct).mode === 8.U &&
+        (pv < PrivilegeLevel.Machine.asUInt)
       // printf("[Debug]Write addr:%x, privilegeMode:%x %x %x %x vm:%x\n", addr, pv, mstatusStruct.mprv.asBool, mstatusStruct.mpp, privilegeMode, vmEnable)
-      mem.write.valid := true.B
-      when(vmEnable) {
+      when(aligned && vmEnable) {
         // TODO: addr's bitwidth is lower than 64 bit, need to be modified
         val (success, finaladdr) = PageTableWalk(addr, Store, pv)
         when(success) {
-          mem.write.addr := finaladdr
+          wAddr := finaladdr
         }.otherwise {
+          excp := true.B
           raiseException(MExceptionCode.storeOrAMOPageFault)
         }
-      }.otherwise {
-        mem.write.addr := addr
       }
-      mem.write.memWidth := memWidth
-      mem.write.data     := data
     }
+
+    val wMask = width2Mask(memWidth)
+    val wData = data & wMask
+
+    mem.write.valid    := !excp
+    mem.write.addr     := wAddr
+    mem.write.memWidth := memWidth
+    mem.write.data     := wData
+
+    excp
   }
 
   def iFetchTrans(addr: UInt): (Bool, UInt) = {
     val vmEnable =
-      now.privilege.csr.satp.asTypeOf(new SatpStruct).mode === 8.U && (now.privilege.internal.privilegeMode < 0x3.U)
+      now.privilege.csr.satp
+        .asTypeOf(new SatpStruct)
+        .mode === 8.U && (now.privilege.mode < PrivilegeLevel.Machine.asUInt)
     // printf("[Debug]iFetchTrans addr:%x, vm:%x \n", addr, vmEnable)
     val resultStatus = Wire(Bool())
     val resultPC     = Wire(UInt(XLEN.W))
@@ -156,6 +182,7 @@ trait MMU extends BaseCore with ExceptionSupport {
     mem.write.memWidth := memWidth
     mem.write.data     := data
   }
+
   def PAWriteMMU(addr: UInt, memWidth: UInt, data: UInt): Unit = {
     // 暂时先使用了一个端口 实际上 dirty操作的是最后找到的那个页 不像读页出现的问题
     tlb.get.Anotherwrite(0).valid    := true.B
@@ -177,7 +204,7 @@ trait MMU extends BaseCore with ExceptionSupport {
     val mstatus_sum = now.privilege.csr.mstatus.asTypeOf((new MstatusStruct)).sum.asBool
     // val permCheck = missflag.v && !(pf.privilegeMode === ModeU && !missflag.u) && !(pf.privilegeMode === ModeS && missflag.u && (!pf.status_sum || ifecth))
     val permCheck =
-      missflag.v && !(privMode === ModeU && !missflag.u) && !(privMode === ModeS && missflag.u && (!mstatus_sum || isiFetch))
+      missflag.v && !(privMode === PrivilegeLevel.User.asUInt && !missflag.u) && !(privMode === PrivilegeLevel.Supervisor.asUInt && missflag.u && (!mstatus_sum || isiFetch))
     val permExec  = permCheck && missflag.x
     val permLoad  = permCheck && (missflag.r || mstatus_mxr && missflag.x)
     val permStore = permCheck && missflag.w
@@ -215,6 +242,7 @@ trait MMU extends BaseCore with ExceptionSupport {
       )
     )
   }
+
   def maskPPN(level: UInt): UInt = {
     val mask = MuxLookup(level, 0.U(44.W))(
       Seq(
@@ -225,6 +253,7 @@ trait MMU extends BaseCore with ExceptionSupport {
     )
     mask
   }
+
   def maskVPN(level: UInt): UInt = {
     val mask = MuxLookup(level, 0.U(44.W))(
       Seq(
@@ -235,6 +264,7 @@ trait MMU extends BaseCore with ExceptionSupport {
     )
     mask
   }
+
   def IsSuperPage(ppn: UInt, level: UInt): Bool = {
     val mask = maskPPN(level)
     // printf("[Debug]SuperPage mask:%x ppn:%x flag:%d\n", mask, ppn, ((mask & ppn) =/= 0.U))

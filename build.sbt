@@ -99,3 +99,27 @@ lazy val root = (project in file("."))
       chiselVersion("plugin") cross CrossVersion.full
     )
   )
+
+lazy val svcore = (project in file("sv-core"))
+  .dependsOn(root)
+  .settings(
+    name := "SystemVerilog Spec Core Generator",
+    scalaVersion := "2.12.17",
+    libraryDependencies ++= {
+      Seq(
+        "com.lihaoyi" %% "upickle" % "2.0.0",
+        "com.github.scopt" %% "scopt" % "4.1.0",
+        "edu.berkeley.cs" %% "chisel3" % "3.6.0",
+        "edu.berkeley.cs" %% "chiseltest" % "0.6.0",
+      )
+    },
+    scalacOptions ++= Seq(
+      "-language:reflectiveCalls",
+      "-deprecation",
+      "-feature",
+      "-Xcheckinit"
+    ),
+    addCompilerPlugin(
+      "edu.berkeley.cs"  % "chisel3-plugin" % "3.6.0" cross CrossVersion.full
+    )
+  )

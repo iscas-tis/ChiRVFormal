@@ -79,7 +79,7 @@ libraryDependencies += "cn.ac.ios.tis" %% "riscvspeccore" % "1.3-8bb84f4-SNAPSHO
   - `1.3-8bb84f4-SNAPSHOT`
   - `1.3-8bb84f4+-SNAPSHOT` (存在未提交的修改)
 
-`-DChiselVerion=<version>` 设置依赖的 Chisel 版本
+`-DChiselVersion=<version>` 设置依赖的 Chisel 版本
 
 - 可选版本如：
   - `3.6.0` `6.4.0` `6.5.0` `7.10.0` `CHA`
@@ -131,8 +131,8 @@ val rvConfig = RVConfig(
   XLEN = 64,
   extensions = "MCZicsrU",
   fakeExtensions = "A",
-  initValue = Map("pc" -> "h0000_8000")
-  functions = Seq("Privileged", "TLB")
+  initValue = Map("pc" -> "h0000_8000"),
+  functions = Seq("Privileged", "TLB"),
   formal = Seq("CheckMem", "CheckCSRs")
 )
 

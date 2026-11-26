@@ -43,7 +43,8 @@ case class RefConfig(
     functions: Seq[String] = Seq.empty,
     formal: Seq[String] = Seq.empty,
     regDelay: Boolean = true,
-    singleInstMode: Option[String] = None
+    singleInstMode: Option[String] = None,
+    csrUpdateSlots: Int = 1
 ) {
   def toRVConfig: RVConfig = {
     RVConfig(

@@ -174,6 +174,13 @@ class CheckerWithState(
 
 }
 
+/** One CSR update in the retirement record. */
+class CSRUpdate(implicit XLEN: Int) extends Bundle {
+  val valid = Bool()
+  val addr = UInt(12.W)
+  val data = UInt(XLEN.W)
+}
+
 class WriteBack()(implicit XLEN: Int) extends Bundle {
   val rs1Addr = UInt(5.W)
   val rs2Addr = UInt(5.W)
@@ -199,14 +206,18 @@ object WriteBack {
   */
 class CheckerWithAction(
     enableReg: Boolean = false,
-    singleInstMode: Option[Inst] = None
+    singleInstMode: Option[Inst] = None,
+    csrUpdateSlots: Int = 1
 )(implicit
     config: RVConfig
 ) extends Checker {
+  require(csrUpdateSlots > 0, "CSR update slot count must be positive")
   val io = IO(new Bundle {
     val instCommit = Input(InstCommit())
     val writeback  = Input(WriteBack())
     val privilege  = Input(PrivilegedState())
+    // Final values of CSR storage written by this instruction, aligned with instCommit.
+    val csrUpdates = if (config.formal.checkCSRs) Some(Input(Vec(csrUpdateSlots, new CSRUpdate))) else None
     val mem        = if (config.formal.checkMem) Some(Input(new MemIO)) else None
     val dtlbmem    = if (config.formal.checkMem && config.functions.tlb) Some(Input(new TLBSig)) else None
     val itlbmem    = if (config.formal.checkMem && config.functions.tlb) Some(Input(new TLBSig)) else None
@@ -302,6 +313,22 @@ class CheckerWithAction(
 
     assert(regDelay(io.instCommit.excp) === regDelay(specCommit.exception))
 
+    // Only reported updates are checked. Invalid slots do not constrain addr/data.
+    if (config.formal.checkCSRs) {
+      val table = specCore.io.next.privilege.csr.table
+      io.csrUpdates.get.foreach { update =>
+        val known = table.map(entry => update.addr === entry.info.addr).reduce(_ || _)
+        val expected = MuxCase(0.U(XLEN.W), table.map { entry =>
+          (update.addr === entry.info.addr) -> entry.signal
+        })
+        when(regDelay(update.valid)) {
+          assert(regDelay(known))
+          assert(regDelay(update.data) === regDelay(expected))
+        }
+      }
+    }
+
+
     when(!regDelay(specCommit.exception)) {
       assert(regDelay(io.writeback.rdAddr) === regDelay(specCommit.rdAddr))
       when(io.writeback.rdAddr =/= 0.U) {
@@ -323,14 +350,7 @@ class CheckerWithAction(
         assert(regDelay(io.writeback.rs2Addr) === regDelay(specCommit.rs2Addr))
       }
 
-      // try to verify csr write and read
-      if (config.formal.checkCSRs) {
-        when(regDelay(specCommit.csrWr) || regDelay(io.writeback.csrWr)) {
-          assert(regDelay(specCommit.csrWr) === regDelay(io.writeback.csrWr))
-          assert(regDelay(specCommit.csrAddr) === regDelay(io.writeback.csrAddr))
-          assert(regDelay(specCommit.csrNdata) === regDelay(io.writeback.csrNdata))
-        }
-      }
+
     }
   }
 
@@ -432,6 +452,7 @@ class CheckerWithWB(
       val pc    = UInt(XLEN.W)
       val npc   = UInt(XLEN.W)
     })
+    val csrUpdates = if (config.formal.checkCSRs) Some(Input(Vec(1, new CSRUpdate))) else None
     val wb = Input(WriteBack())
     val privilege = Input(new Bundle() {
       val csr = CSR()
@@ -467,6 +488,7 @@ class CheckerWithWB(
   checker.io.instCommit.pc    := io.instCommit.pc
   checker.io.instCommit.npc   := io.instCommit.npc
 
+  checker.io.csrUpdates.foreach(_ := io.csrUpdates.get)
   checker.io.writeback := io.wb
 
   checker.io.privilege.mode := io.privilege.internal.privilegeMode

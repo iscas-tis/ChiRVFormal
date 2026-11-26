@@ -124,6 +124,11 @@ class CheckerWithActionSpec extends AnyFlatSpec with ChiselScalatestTester {
     checker.io.instCommit.pc    := state.pc
     checker.io.instCommit.npc   := trans.io.next.pc
 
+    checker.io.csrUpdates.foreach { updates =>
+      updates(0).valid := trans.io.commit.csrWr
+      updates(0).addr := trans.io.commit.csrAddr
+      updates(0).data := trans.io.commit.csrNdata
+    }
     checker.io.writeback := writeback
 
     checker.io.privilege := state.privilege

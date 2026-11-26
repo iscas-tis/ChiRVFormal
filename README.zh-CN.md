@@ -447,3 +447,34 @@ GitHub Actions 可以在每次 push 代码到 GitHub 的时候自动运行验证
 **SETTA 2024: Formal Verification of RISC-V Processor Chisel Designs** [Link](https://link.springer.com/chapter/10.1007/978-981-96-0602-3_8) | [BibTex](https://citation-needed.springer.com/v2/references/10.1007/978-981-96-0602-3_8?format=bibtex&flavour=citation)
 
 **JSA 2026: χRVFormal: Formal Verification of RISC-V Processor Chisel Designs** [Link](https://doi.org/10.1016/j.sysarc.2026.103761) | [BibTex](https://www.sciencedirect.com/sdfe/arp/cite?pii=S1383762126000792&format=text%2Fx-bibtex&withabstract=true)
+
+
+### ActionChecker 的 CSR 检查
+
+`CheckerWithAction.io.csrUpdates` 是 `Vec(csrUpdateSlots, CSRUpdate)`，每个元素包含：
+
+- `valid`：当前提交指令是否提供这一项更新。
+- `addr`：12 位 CSR 地址。
+- `data`：该指令执行后的 CSR 值，宽度为 XLEN。
+
+Scala 构造时通过 `csrUpdateSlots` 指定最大更新项数，默认 1；SV 生成配置使用
+`"csrUpdateSlots": 5`。槽位不绑定固定 CSR，未使用的槽位置 `valid=false`，其地址和值不参与检查。
+Checker 在指令有效时遍历有效槽位，按地址选择 `specCore.io.next.privilege.csr.table` 的寄存器，
+比较执行后的值；不认识的有效地址会触发断言。未出现在 Vec 有效项中的 CSR 不进行比较，
+因此此接口本身不检测漏报更新。DUT 应完整报告希望验证的更新，且不能以截断更新项来解决槽位不足。
+
+```scala
+val updates = checker.io.csrUpdates.get
+updates(0).valid := commitCsrWrite
+updates(0).addr := commitCsrAddress
+updates(0).data := commitCsrFinalValue
+```
+
+SV 端口为 `csrUpdates_0_valid/addr/data` 等。NERV 从 RTL CSR 定义枚举全部 102 个可变架构 CSR，
+每个 CSR 占一个槽位，以同一 RVFI 记录中的执行前值和最终值比较产生 valid，覆盖显式写入、
+异常/返回、自动计数器、性能事件和自定义 CSR 的变化；常量 CSR 不占槽位。
+槽位数取全部可变 CSR 数量，保证不会因同时变化项过多而截断。
+自定义地址若不在参考模型中，会触发未知地址断言；计数器的自动变化也可能暴露参考模型差异，不能为使证明通过而漏报。
+PicoRV32 当前配置未启用 CSR 检查，无更新端口，其 BMC 不代表 CSR 已验证。
+旧 `csrWr/csrAddr/csrNdata` 保留用于兼容，CSR 比较改由更新 Vec 提供。
+使用 ConnectHelper 时通过 `setCSRUpdates(updates)` 发布整个 Vec。

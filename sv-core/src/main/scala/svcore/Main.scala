@@ -58,7 +58,7 @@ object Main extends App {
           args.model match {
             case "action" =>
               chiselStage.emitSystemVerilog(
-                new ActionChecker(config.regDelay, config.getSingleInstMode)(config.toRVConfig),
+                new ActionChecker(config.regDelay, config.getSingleInstMode, config.csrUpdateSlots)(config.toRVConfig),
                 Array(
                   "--target-dir",
                   args.targetDir,

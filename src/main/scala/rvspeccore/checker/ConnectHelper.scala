@@ -13,11 +13,15 @@ object ConnectHelper {
     val uniqueIdReg: String       = "ConnectChecker_UniqueIdReg"
     val uniqueIdMem: String       = "ConnectChecker_UniqueIdMem"
     val uniqueIdPrivilege: String = "ConnectChecker_UniqueIdPrivilege"
+    val uniqueIdCSRUpdates: String = "ConnectChecker_UniqueIdCSRUpdates"
     val uniqueIdEvent: String     = "ConnectChecker_UniqueIdEvent"
     val uniqueIdITLB: String      = "ConnectChecker_UniqueIdITLB"
     val uniqueIdDTLB: String      = "ConnectChecker_UniqueIdDTLB"
   }
   import UniqueId._
+
+  /** Publish the per-CSR updates aligned with instCommit. */
+  def setCSRUpdates(csr: Vec[CSRUpdate]): Unit = BoringUtils.addSource(csr, uniqueIdCSRUpdates)
 
   def regNextDelay[T <: Bundle](signal: T, delay: Int): T = {
     delay match {
@@ -166,6 +170,9 @@ object ConnectHelper {
     privilege := DontCare
     BoringUtils.addSink(privilege, uniqueIdPrivilege)
     checker.io.privilege := privilege
+    checker.io.csrUpdates.foreach { csr =>
+      BoringUtils.addSink(csr, uniqueIdCSRUpdates)
+    }
 
     // mem
     if (config.formal.checkMem) {

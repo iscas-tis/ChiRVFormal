@@ -517,7 +517,7 @@ object CSRWrapperIO {
   def apply()(implicit config: RVConfig): CSRWrapperIO = new CSRWrapperIO
 }
 
-class ActionChecker(enableReg: Boolean = true, singleInstMode: Option[Inst] = None)(implicit config: RVConfig)
+class ActionChecker(enableReg: Boolean = true, singleInstMode: Option[Inst] = None, csrUpdateSlots: Int = 1)(implicit config: RVConfig)
     extends Module {
   implicit val XLEN: Int = config.XLEN
 
@@ -527,8 +527,12 @@ class ActionChecker(enableReg: Boolean = true, singleInstMode: Option[Inst] = No
   val mode      = if (config.formal.checkCSRs) Some(IO(Input(UInt(2.W)))) else None
   val csr       = if (config.formal.checkCSRs) Some(IO(Input(CSRWrapperIO()))) else None
 
-  val check = Module(new CheckerWithAction(enableReg, singleInstMode))
+  // Per-CSR final write values and enables, aligned with commit.
+  val csrUpdates = if (config.formal.checkCSRs) Some(IO(Input(Vec(csrUpdateSlots, new CSRUpdate)))) else None
 
+  val check = Module(new CheckerWithAction(enableReg, singleInstMode, csrUpdateSlots))
+
+  check.io.csrUpdates.foreach(_ := csrUpdates.get)
   check.io.instCommit := commit
   check.io.writeback  := writeback
   if (config.formal.checkMem) { check.io.mem.get := mem.get }
